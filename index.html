@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SensorTech · Mantenimiento Predictivo 4.0</title>
+  
+  <!-- A-Frame y aframe-extras -->
+  <script src="https://aframe.io/releases/1.5.0/aframe.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/gh/c-frame/aframe-extras@7.2.0/dist/aframe-extras.min.js" crossorigin="anonymous"></script>
+  
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { 
+      background: #030712; 
+      font-family: system-ui, -apple-system, sans-serif; 
+      color: #F8FAFC; 
+      overflow-x: hidden;
+    }
+
+    /* --- SECCIÓN DE INTRODUCCIÓN WEB --- */
+    header {
+      background: linear-gradient(135deg, #0A192F 0%, #020617 100%);
+      border-bottom: 2px solid #00F0FF;
+      padding: 60px 20px;
+      text-align: center;
+    }
+    .intro-container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    .logo-title {
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 800;
+      color: #FFFFFF;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+    }
+    .logo-highlight { color: #00F0FF; }
+    .subtitle {
+      font-size: 18px;
+      color: #38BDF8;
+      font-weight: 600;
+      letter-spacing: 2px;
+      margin-bottom: 30px;
+      text-transform: uppercase;
+    }
+    .about-text {
+      font-size: 16px;
+      line-height: 1.8;
+      color: #CBD5E1;
+      text-align: justify;
+      margin-bottom: 20px;
+    }
+    .features {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 30px;
+    }
+    .feature-chip {
+      background: rgba(15, 23, 42, 0.8);
+      border: 1px solid #1E40AF;
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #E2E8F0;
+    }
+
+    /* --- CONTENEDOR DE REALIDAD VIRTUAL --- */
+    #vr-section {
+      width: 100%;
+      height: 85vh;
+      position: relative;
+      background: #000;
+    }
+    
+    #vr-start-overlay {
+      position: absolute; inset: 0; z-index: 99999;
+      background: radial-gradient(circle at 50% 35%, rgba(10, 61, 145, 0.92), rgba(2, 6, 23, 0.98));
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 24px; text-align: center; cursor: pointer; transition: opacity 0.35s ease;
+    }
+    .overlay-box {
+      max-width: 680px; width: 100%; padding: 40px 32px;
+      background: rgba(15, 23, 42, 0.85); border: 2px solid #00F0FF; border-radius: 16px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.75);
+    }
+    .overlay-kicker { color: #00F0FF; font-size: 13px; letter-spacing: 0.14em; font-weight: 700; margin-bottom: 12px; }
+    .overlay-title { font-size: clamp(26px, 4vw, 38px); font-weight: 800; line-height: 1.15; margin-bottom: 16px; color: #FFFFFF; }
+    .overlay-desc { font-size: 15px; line-height: 1.6; color: #CBD5E1; margin-bottom: 28px; }
+    .overlay-cta {
+      display: inline-block; padding: 16px 34px; font-size: 18px; font-weight: 700;
+      color: #020617; background: #00F0FF; border: none; border-radius: 10px;
+      cursor: pointer; box-shadow: 0 0 25px rgba(0, 240, 255, 0.5);
+    }
+    #hud-subtitle {
+      position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%);
+      z-index: 1000; max-width: 820px; width: calc(100% - 32px);
+      background: rgba(3, 10, 24, 0.88); border: 1px solid rgba(0, 240, 255, 0.45);
+      border-radius: 12px; padding: 14px 20px; display: none; pointer-events: none;
+    }
+    #hud-subtitle-label { color: #00F0FF; font-size: 12px; font-weight: 700; margin-bottom: 4px; }
+    #hud-subtitle-text { color: #F8FAFC; font-size: 14px; line-height: 1.5; }
+  </style>
+
+  <script>
+    // ============================================================================
+    // GESTOR DE AUDIO Y SÍNTESIS DE VOZ CORREGIDO PARA META QUEST
+    // ============================================================================
+    window.SensorTechVR = {
+      audioUnlocked: false,
+      isSpeaking: false,
+      preferredVoice: null,
+      audioCtx: null,
+
+      loadVoices: function() {
+        if (!('speechSynthesis' in window)) return;
+        const voices = window.speechSynthesis.getVoices();
+        const codes = ['es-MX', 'es-419', 'es-US', 'es-CO', 'es-AR', 'es-CL'];
+        for (let i = 0; i < codes.length; i++) {
+          const found = voices.find(v => v.lang.toLowerCase() === codes[i].toLowerCase());
+          if (found) { this.preferredVoice = found; return; }
+        }
+        const anyEs = voices.find(v => v.lang.toLowerCase().startsWith('es'));
+        if (anyEs) this.preferredVoice = anyEs;
+      },
+
+      unlockAudio: function() {
+        if (this.audioUnlocked) return;
+        this.audioUnlocked = true;
+        
+        try {
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            this.audioCtx = new AudioContextClass();
+            if (this.audioCtx.state === 'suspended') this.audioCtx.resume();
+          }
+        } catch (e) { console.warn("AudioContext no soportado"); }
+
+        if ('speechSynthesis' in window) {
+          this.loadVoices();
+          window.speechSynthesis.cancel();
+          // Forzar la activación del motor con un string corto y volumen mínimo
+          const warmUp = new SpeechSynthesisUtterance('Iniciando sistema Sensor Tech');
+          warmUp.volume = 0.01; 
+          warmUp.lang = 'es-MX';
+          window.speechSynthesis.speak(warmUp);
+        }
+      },
+
+      speak: function(pointId, text) {
+        if (!this.audioUnlocked) return;
+        const subBox = document.getElementById('hud-subtitle');
+        const subText = document.getElementById('hud-subtitle-text');
+        if (subBox && subText) {
+          subText.textContent = text;
+          subBox.style.display = 'block';
+        }
+        this.isSpeaking = true;
+
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const u = new SpeechSynthesisUtterance(text);
+        if (!this.preferredVoice) this.loadVoices();
+        if (this.preferredVoice) {
+          u.voice = this.preferredVoice;
+          u.lang = this.preferredVoice.lang;
+        } else {
+          u.lang = 'es-MX';
+        }
+        u.rate = 1.0;
+        u.pitch = 0.96;
+        u.onend = () => { this.isSpeaking = false; };
+        u.onerror = () => { this.isSpeaking = false; };
+        window.speechSynthesis.speak(u);
+      }
+    };
+
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.onvoiceschanged = () => window.SensorTechVR.loadVoices();
+    }
+
+    // Escuchador para reanudar el contexto de audio al entrar a VR en Meta Quest
+    window.addEventListener('DOMContentLoaded', () => {
+      const scene = document.querySelector('a-scene');
+      if (scene) {
+        scene.addEventListener('enter-vr', function () {
+          if (window.SensorTechVR.audioCtx && window.SensorTechVR.audioCtx.state === 'suspended') {
+            window.SensorTechVR.audioCtx.resume();
+          }
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.resume();
+          }
+        });
+      }
+    });
+
+    // ============================================================================
+    // RENDERIZADORES DE CANVAS 2D DE ALTA RESOLUCIÓN Y COMPONENTES
+    // ============================================================================
+    const drawCentralDashboardCanvas = function drawCentralDashboardCanvas(ctx, width, height, tick) {
+	const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
+	bgGrad.addColorStop(0, "#040B16"); bgGrad.addColorStop(.5, "#071426"); bgGrad.addColorStop(1, "#030914");
+	ctx.fillStyle = bgGrad; ctx.fillRect(0, 0, width, height);
+	ctx.strokeStyle = "rgba(0, 240, 255, 0.05)"; ctx.lineWidth = 2;
+	for (let x = 0; x < width; x += 64) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+	for (let y = 0; y < height; y += 64) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke(); }
+	ctx.strokeStyle = "#00F0FF"; ctx.lineWidth = 6; ctx.strokeRect(16, 16, width - 32, height - 32);
+	ctx.fillStyle = "rgba(10, 37, 74, 0.85)"; ctx.fillRect(28, 28, width - 56, 150);
+	ctx.strokeStyle = "#00E5FF"; ctx.lineWidth = 3; ctx.strokeRect(28, 28, width - 56, 150);
+	ctx.fillStyle = "#00F0FF"; ctx.font = "bold 52px \"Chakra Petch\", sans-serif";
+	ctx.fillText("SENSORTECH AI · SERVIDOR CENTRAL DE MANTENIMIENTO PREDICTIVO", 64, 98);
+	ctx.fillStyle = "#94A3B8"; ctx.font = "600 30px \"Plus Jakarta Sans\", sans-serif";
+	ctx.fillText("PLANTA DE INYECCIÓN DE PLÁSTICO INDUSTRIA 4.0  |  NODOS ESP32 + BME280 ACTIVOS: 06/06  |  MODELO ML: RANDOM FOREST + LSTM v4.2", 64, 148);
+	const pulse = .5 + .5 * Math.sin(tick * .25);
+	ctx.fillStyle = `rgba(0, 230, 118, ${.25 + pulse * .35})`; ctx.fillRect(width - 420, 52, 360, 100);
+	ctx.strokeStyle = "#00E676"; ctx.lineWidth = 3; ctx.strokeRect(width - 420, 52, 360, 100);
+	ctx.fillStyle = "#00E676"; ctx.font = "bold 34px \"JetBrains Mono\", monospace";
+	ctx.fillText("● TELEMETRÍA EN VIVO", width - 395, 114);
+	const kpis = [
+		{ label: "TEMPERATURA BARRIL", value: `${(218.4 + Math.sin(tick * .12) * 1.3).toFixed(1)} °C`, sub: "Rango nominal: 195°C - 225°C", color: "#00F0FF" },
+		{ label: "VIBRACIÓN RMS", value: `${(1.82 + Math.cos(tick * .18) * .14).toFixed(2)} mm/s`, sub: "Umbral crítico ML: 4.50 mm/s", color: "#00E676" },
+		{ label: "PRESIÓN / HUMEDAD", value: `1013 hPa · ${(41.5 + Math.sin(tick * .07) * .4).toFixed(1)}%`, sub: "Sensor BME280 I2C Calibrado", color: "#38BDF8" },
+		{ label: "REDUCCIÓN MERMAS", value: "-38.4%  |  OEE 96.8%", sub: "Cero paros no programados", color: "#FBBF24" }
+	];
+	const cardW = 472; const cardH = 220;
+	kpis.forEach((kpi, idx) => {
+		const x = 28 + idx * (cardW + 24); const y = 205;
+		ctx.fillStyle = "rgba(13, 28, 52, 0.92)"; ctx.fillRect(x, y, cardW, cardH);
+		ctx.strokeStyle = kpi.color; ctx.lineWidth = 3; ctx.strokeRect(x, y, cardW, cardH);
+		ctx.fillStyle = "#94A3B8"; ctx.font = "bold 24px \"Plus Jakarta Sans\", sans-serif"; ctx.fillText(kpi.label, x + 26, y + 52);
+		ctx.fillStyle = kpi.color; ctx.font = "bold 54px \"JetBrains Mono\", monospace"; ctx.fillText(kpi.value, x + 26, y + 132);
+		ctx.fillStyle = "#CBD5E1"; ctx.font = "500 24px \"Plus Jakarta Sans\", sans-serif"; ctx.fillText(kpi.sub, x + 26, y + 186);
+	});
+	const leftX = 28; const leftY = 455; const leftW = 1260; const leftH = 790;
+	ctx.fillStyle = "rgba(9, 22, 42, 0.94)"; ctx.fillRect(leftX, leftY, leftW, leftH);
+	ctx.strokeStyle = "#1E40AF"; ctx.lineWidth = 4; ctx.strokeRect(leftX, leftY, leftW, leftH);
+	ctx.fillStyle = "#F8FAFC"; ctx.font = "bold 36px \"Chakra Petch\", sans-serif";
+	ctx.fillText("1. CURVA TÉRMICA DEL CILINDRO DE INYECCIÓN Y PREDICCIÓN HORIZONTE ML (°C)", leftX + 32, leftY + 56);
+	const plotX = leftX + 95; const plotY = leftY + 140; const plotW = leftW - 140; const plotH = 570;
+	ctx.fillStyle = "#040D1A"; ctx.fillRect(plotX, plotY, plotW, plotH);
+	ctx.strokeStyle = "#1E293B"; ctx.lineWidth = 2; ctx.strokeRect(plotX, plotY, plotW, plotH);
+	const tempLevels = [250, 240, 225, 210, 195, 180];
+	tempLevels.forEach((temp) => {
+		const ratio = (250 - temp) / (250 - 180); const y = plotY + ratio * plotH;
+		ctx.strokeStyle = temp === 240 ? "rgba(239, 68, 68, 0.8)" : "rgba(148, 163, 184, 0.18)"; ctx.lineWidth = temp === 240 ? 3 : 1.5;
+		ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
+		ctx.fillStyle = temp === 240 ? "#EF4444" : "#94A3B8"; ctx.font = "bold 22px \"JetBrains Mono\", monospace"; ctx.fillText(`${temp}°C`, leftX + 18, y + 8);
+	});
+	const y225 = plotY + (250 - 225) / 70 * plotH; const y195 = plotY + (250 - 195) / 70 * plotH;
+	ctx.fillStyle = "rgba(0, 230, 118, 0.08)"; ctx.fillRect(plotX, y225, plotW, y195 - y225);
+	ctx.strokeStyle = "#00F0FF"; ctx.lineWidth = 5; ctx.beginPath();
+	const splitIndex = 36; const totalPoints = 50;
+	for (let i = 0; i <= splitIndex; i++) {
+		const px = plotX + i / totalPoints * plotW;
+		const tempVal = 214 + Math.sin((i + tick * .4) * .22) * 5.5 + Math.cos((i - tick * .2) * .45) * 2.4;
+		const py = plotY + (250 - tempVal) / 70 * plotH;
+		if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+	}
+	ctx.stroke();
+	ctx.save(); ctx.setLineDash([12, 8]); ctx.strokeStyle = "#FBBF24"; ctx.lineWidth = 5; ctx.beginPath();
+	for (let i = splitIndex; i <= totalPoints; i++) {
+		const px = plotX + i / totalPoints * plotW; const progress = (i - splitIndex) / (totalPoints - splitIndex);
+		const predictedTemp = 217 + progress * 15.5 + Math.sin((i + tick * .4) * .25) * 3.8;
+		const py = plotY + (250 - predictedTemp) / 70 * plotH;
+		if (i === splitIndex) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+	}
+	ctx.stroke(); ctx.restore();
+	const alertX = plotX + 41 / totalPoints * plotW - 190; const alertY = plotY + 55;
+	ctx.fillStyle = "rgba(245, 158, 11, 0.22)"; ctx.fillRect(alertX, alertY, 390, 74);
+	ctx.strokeStyle = "#F59E0B"; ctx.lineWidth = 3; ctx.strokeRect(alertX, alertY, 390, 74);
+	ctx.fillStyle = "#FDE68A"; ctx.font = "bold 23px \"JetBrains Mono\", monospace";
+	ctx.fillText("⚠ ALERTA TEMPRANA IA: +14°C", alertX + 18, alertY + 32);
+	const rightX = 1312; const rightY = 455; const rightW = 708; const rightH = 790;
+	ctx.fillStyle = "rgba(9, 22, 42, 0.94)"; ctx.fillRect(rightX, rightY, rightW, rightH);
+	ctx.strokeStyle = "#00F0FF"; ctx.lineWidth = 4; ctx.strokeRect(rightX, rightY, rightW, rightH);
+	ctx.fillStyle = "#F8FAFC"; ctx.font = "bold 34px \"Chakra Petch\", sans-serif";
+	ctx.fillText("2. ESTADO DE MÁQUINAS", rightX + 28, rightY + 56);
+	const machines = [
+		{ id: "INY-01", temp: "215.2°C", vib: "1.41 mm/s", amp: "39.8 A", rul: "98%", status: "ÓPTIMO", col: "#00E676" },
+		{ id: "INY-02", temp: "218.4°C", vib: "1.84 mm/s", amp: "42.6 A", rul: "94%", status: "MONITOREADO", col: "#00F0FF" },
+		{ id: "INY-03", temp: "229.8°C", vib: "3.12 mm/s", amp: "47.1 A", rul: "79%", status: "PREDICCIÓN", col: "#FBBF24" },
+		{ id: "INY-04", temp: "214.0°C", vib: "1.29 mm/s", amp: "38.4 A", rul: "99%", status: "ÓPTIMO", col: "#00E676" },
+		{ id: "INY-05", temp: "216.7°C", vib: "1.52 mm/s", amp: "40.2 A", rul: "97%", status: "ÓPTIMO", col: "#00E676" },
+		{ id: "INY-06", temp: "215.9°C", vib: "1.38 mm/s", amp: "39.1 A", rul: "98%", status: "ÓPTIMO", col: "#00E676" }
+	];
+	machines.forEach((m, idx) => {
+		const my = rightY + 92 + idx * 110;
+		ctx.fillStyle = idx === 1 || idx === 2 ? "rgba(30, 58, 138, 0.45)" : "rgba(15, 23, 42, 0.8)";
+		ctx.fillRect(rightX + 24, my, rightW - 48, 94);
+		ctx.strokeStyle = m.col; ctx.lineWidth = 2.5; ctx.strokeRect(rightX + 24, my, rightW - 48, 94);
+		ctx.fillStyle = "#FFFFFF"; ctx.font = "bold 25px \"JetBrains Mono\", monospace"; ctx.fillText(m.id, rightX + 42, my + 36);
+		ctx.fillStyle = m.col; ctx.font = "bold 23px \"JetBrains Mono\", monospace"; ctx.fillText(`[${m.status}]`, rightX + 440, my + 36);
+		ctx.fillStyle = "#CBD5E1"; ctx.font = "22px \"JetBrains Mono\", monospace"; ctx.fillText(`T:${m.temp} | Vib:${m.vib}`, rightX + 42, my + 74);
+	});
+	const botY = 1270; const botH = 745;
+	ctx.fillStyle = "rgba(9, 22, 42, 0.94)"; ctx.fillRect(leftX, botY, 1e3, botH);
+	ctx.strokeStyle = "#1E40AF"; ctx.lineWidth = 4; ctx.strokeRect(leftX, botY, 1e3, botH);
+	ctx.fillStyle = "#F8FAFC"; ctx.font = "bold 34px \"Chakra Petch\", sans-serif";
+	ctx.fillText("3. ANÁLISIS ESPECTRAL (FFT)", leftX + 32, botY + 54);
+	const barAreaX = leftX + 60; const barAreaY = botY + 135; const barAreaW = 890; const barAreaH = 540;
+	ctx.fillStyle = "#040D1A"; ctx.fillRect(barAreaX, barAreaY, barAreaW, barAreaH);
+	const numBars = 28; const barW = Math.floor(barAreaW / numBars) - 8;
+	for (let b = 0; b < numBars; b++) {
+		const bx = barAreaX + 12 + b * (barW + 8);
+		const isAnomalyBand = b === 17 || b === 18;
+		const wave = Math.abs(Math.sin(b * .45 + tick * .25)) * .45 + (isAnomalyBand ? .42 : .15);
+		const bh = Math.min(barAreaH - 40, Math.max(36, wave * barAreaH));
+		const by = barAreaY + barAreaH - bh;
+		ctx.fillStyle = isAnomalyBand ? "#F59E0B" : b > 21 ? "#38BDF8" : "#00F0FF";
+		ctx.fillRect(bx, by, barW, bh);
+	}
+	const mlX = 1052; const mlW = 968;
+	ctx.fillStyle = "rgba(9, 22, 42, 0.94)"; ctx.fillRect(mlX, botY, mlW, botH);
+	ctx.strokeStyle = "#00E676"; ctx.lineWidth = 4; ctx.strokeRect(mlX, botY, mlW, botH);
+	ctx.fillStyle = "#00E676"; ctx.font = "bold 36px \"Chakra Petch\", sans-serif";
+	ctx.fillText("4. INTELIGENCIA ARTIFICIAL", mlX + 32, botY + 56);
+	const insights = [
+		{ title: "DIAGNÓSTICO EN TIEMPO REAL", desc: "Fusión de datos BME280 + Vibración." },
+		{ title: "ALERTA PRE-FALLA", desc: "Desviación térmica detectada." },
+		{ title: "IMPACTO OPERATIVO", desc: "Reducción de mermas en 38.4%." },
+		{ title: "ARQUITECTURA CLOUD", desc: "Inferencia vía MQTT/TLS." }
+	];
+	insights.forEach((item, idx) => {
+		const iy = botY + 95 + idx * 152;
+		ctx.fillStyle = "rgba(15, 35, 66, 0.85)"; ctx.fillRect(mlX + 32, iy, mlW - 64, 132);
+		ctx.strokeStyle = idx === 1 ? "#FBBF24" : "#00F0FF"; ctx.lineWidth = 2; ctx.strokeRect(mlX + 32, iy, mlW - 64, 132);
+		ctx.fillStyle = idx === 1 ? "#FBBF24" : "#00F0FF"; ctx.font = "bold 26px \"Chakra Petch\", sans-serif";
+		ctx.fillText(`▸ ${item.title}`, mlX + 54, iy + 46);
+		ctx.fillStyle = "#E2E8F0"; ctx.font = "24px \"Plus Jakarta Sans\", sans-serif";
+		ctx.fillText(item.desc, mlX + 54, iy + 94);
+	});
+};
+    const drawIoTNodeCanvas = function drawIoTNodeCanvas(ctx, width, height, tick) {
+	ctx.fillStyle = "#050E1D"; ctx.fillRect(0, 0, width, height);
+	ctx.strokeStyle = "#00F0FF"; ctx.lineWidth = 8; ctx.strokeRect(12, 12, width - 24, height - 24);
+	ctx.fillStyle = "#0A254A"; ctx.fillRect(24, 24, width - 48, 130);
+	ctx.fillStyle = "#00F0FF"; ctx.font = "bold 42px \"Chakra Petch\", sans-serif";
+	ctx.fillText("NODO IOT ESTACIÓN #02", 48, 82);
+	const temp = (218.4 + Math.sin(tick * .2) * .9).toFixed(1);
+	const pres = (1013.2 + Math.cos(tick * .1) * .4).toFixed(1);
+	const hum = (41.2 + Math.sin(tick * .15) * .3).toFixed(1);
+	const vib = (1.84 + Math.cos(tick * .25) * .12).toFixed(2);
+	const amp = (42.6 + Math.sin(tick * .3) * .8).toFixed(1);
+	const rows = [
+		{ name: "TEMPERATURA", val: `${temp} °C`, status: "NOMINAL", col: "#00F0FF" },
+		{ name: "PRESIÓN BAROMÉTRICA", val: `${pres} hPa`, status: "ESTABLE", col: "#38BDF8" },
+		{ name: "HUMEDAD RELATIVA", val: `${hum} %`, status: "SECO OK", col: "#00E676" },
+		{ name: "VIBRACIÓN RMS", val: `${vib} mm/s`, status: "BAJA VIB", col: "#00E676" },
+		{ name: "CORRIENTE MOTOR", val: `${amp} A`, status: "CARGA NORMAL", col: "#FBBF24" }
+	];
+	rows.forEach((r, idx) => {
+		const y = 180 + idx * 130;
+		ctx.fillStyle = "#0B1B33"; ctx.fillRect(36, y, width - 72, 112);
+		ctx.strokeStyle = r.col; ctx.lineWidth = 3; ctx.strokeRect(36, y, width - 72, 112);
+		ctx.fillStyle = "#CBD5E1"; ctx.font = "bold 26px \"Plus Jakarta Sans\", sans-serif"; ctx.fillText(r.name, 60, y + 42);
+		ctx.fillStyle = r.col; ctx.font = "bold 44px \"JetBrains Mono\", monospace"; ctx.fillText(r.val, 60, y + 92);
+		ctx.fillStyle = r.col; ctx.font = "bold 26px \"JetBrains Mono\", monospace"; ctx.fillText(`● ${r.status}`, width - 310, y + 70);
+	});
+	const waveY = 845;
+	ctx.fillStyle = "#030812"; ctx.fillRect(36, waveY, width - 72, 145);
+	ctx.strokeStyle = "#1E3A8A"; ctx.lineWidth = 2; ctx.strokeRect(36, waveY, width - 72, 145);
+	ctx.strokeStyle = "#00E676"; ctx.lineWidth = 4; ctx.beginPath();
+	for (let i = 0; i <= 60; i++) {
+		const wx = 48 + i / 60 * (width - 96);
+		const wy = waveY + 72 + Math.sin(i * .4 + tick * .5) * 38 * Math.cos(i * .15);
+		if (i === 0) ctx.moveTo(wx, wy); else ctx.lineTo(wx, wy);
+	}
+	ctx.stroke();
+};
+
+    AFRAME.registerComponent('follow-player', {
+      schema: { distance: { type: 'number', default: 1.5 }, sideOffset: { type: 'number', default: 0.68 }, heightOffset: { type: 'number', default: 0.02 }, lerpFactor: { type: 'number', default: 0.04 } },
+      init: function () {
+        this.cameraEl = null; this.camWorldPos = new THREE.Vector3(); this.camForward = new THREE.Vector3(); this.camRight = new THREE.Vector3();
+        this.targetPos = new THREE.Vector3(0.75, 1.7, 19.8); this.currentPos = new THREE.Vector3(0.75, 1.7, 19.8);
+        this.ringOuter = this.el.querySelector('.drone-ring-outer'); this.ringInner = this.el.querySelector('.drone-ring-inner'); this.eyeCore = this.el.querySelector('.drone-eye-core');
+      },
+      tick: function (time) {
+        if (!this.cameraEl) { this.cameraEl = document.querySelector('#player-camera') || document.querySelector('[camera]'); if (!this.cameraEl) return; }
+        this.cameraEl.object3D.getWorldPosition(this.camWorldPos); this.cameraEl.object3D.getWorldDirection(this.camForward);
+        this.camForward.negate(); this.camForward.y = 0;
+        if (this.camForward.lengthSq() > 0.0001) this.camForward.normalize(); else this.camForward.set(0, 0, -1);
+        this.camRight.set(-this.camForward.z, 0, this.camForward.x).normalize();
+        this.targetPos.copy(this.camWorldPos).addScaledVector(this.camForward, this.data.distance).addScaledVector(this.camRight, this.data.sideOffset);
+        this.targetPos.y = Math.max(1.35, this.camWorldPos.y + this.data.heightOffset + Math.sin(time * 0.0028) * 0.075);
+        this.targetPos.x = Math.max(-2.3, Math.min(2.3, this.targetPos.x));
+        this.currentPos.lerp(this.targetPos, this.data.lerpFactor);
+        this.el.object3D.position.copy(this.currentPos); this.el.object3D.lookAt(this.camWorldPos.x, this.camWorldPos.y - 0.05, this.camWorldPos.z);
+        const boost = window.SensorTechVR.isSpeaking ? 3.4 : 1.0;
+        if (this.ringOuter) this.ringOuter.object3D.rotation.z += 0.014 * boost;
+        if (this.ringInner) this.ringInner.object3D.rotation.y += 0.02 * boost;
+        if (this.eyeCore) { const s = window.SensorTechVR.isSpeaking ? 1 + Math.sin(time * 0.022) * 0.28 : 1; this.eyeCore.object3D.scale.set(s, s, 1); }
+      }
+    });
+
+    AFRAME.registerComponent('proximity-trigger', {
+      schema: { pointId: { type: 'string', default: '' }, radius: { type: 'number', default: 2.8 }, text: { type: 'string', default: '' } },
+      init: function () { this.isInside = false; this.cameraEl = null; this.camPos = new THREE.Vector3(); this.myPos = new THREE.Vector3(); },
+      tick: function () {
+        if (!window.SensorTechVR.audioUnlocked) return;
+        if (!this.cameraEl) { this.cameraEl = document.querySelector('#player-camera') || document.querySelector('[camera]'); if (!this.cameraEl) return; }
+        this.cameraEl.object3D.getWorldPosition(this.camPos); this.el.object3D.getWorldPosition(this.myPos);
+        const dx = this.camPos.x - this.myPos.x; const dz = this.camPos.z - this.myPos.z; const dist = Math.sqrt(dx * dx + dz * dz);
+        if (dist <= this.data.radius && !this.isInside) { this.isInside = true; window.SensorTechVR.speak(this.data.pointId, this.data.text); } 
+        else if (dist > this.data.radius + 0.65 && this.isInside) { this.isInside = false; }
+      }
+    });
+
+    AFRAME.registerComponent('high-res-dashboard', {
+      init: function () {
+        this.canvas = document.createElement('canvas'); this.canvas.width = 2048; this.canvas.height = 2048; this.ctx = this.canvas.getContext('2d');
+        this.tickCount = 0; this.lastUpdate = 0; drawCentralDashboardCanvas(this.ctx, 2048, 2048, 0);
+        this.texture = new THREE.CanvasTexture(this.canvas); this.texture.minFilter = THREE.LinearFilter; this.texture.magFilter = THREE.LinearFilter; this.texture.anisotropy = 16;
+        const apply = () => { const mesh = this.el.getObject3D('mesh'); if (mesh) mesh.material = new THREE.MeshBasicMaterial({ map: this.texture }); };
+        apply(); this.el.addEventListener('object3dset', apply);
+      },
+      tick: function (time) {
+        if (time - this.lastUpdate < 160) return;
+        this.lastUpdate = time; this.tickCount++; drawCentralDashboardCanvas(this.ctx, 2048, 2048, this.tickCount); this.texture.needsUpdate = true;
+      }
+    });
+
+    AFRAME.registerComponent('iot-hmi-screen', {
+      init: function () {
+        this.canvas = document.createElement('canvas'); this.canvas.width = 1024; this.canvas.height = 1024; this.ctx = this.canvas.getContext('2d');
+        this.tickCount = 0; this.lastUpdate = 0; drawIoTNodeCanvas(this.ctx, 1024, 1024, 0);
+        this.texture = new THREE.CanvasTexture(this.canvas); this.texture.minFilter = THREE.LinearFilter; this.texture.magFilter = THREE.LinearFilter; this.texture.anisotropy = 16;
+        const apply = () => { const mesh = this.el.getObject3D('mesh'); if (mesh) mesh.material = new THREE.MeshBasicMaterial({ map: this.texture }); };
+        apply(); this.el.addEventListener('object3dset', apply);
+      },
+      tick: function (time) {
+        if (time - this.lastUpdate < 200) return;
+        this.lastUpdate = time; this.tickCount++; drawIoTNodeCanvas(this.ctx, 1024, 1024, this.tickCount); this.texture.needsUpdate = true;
+      }
+    });
+
+    AFRAME.registerComponent('robot-arm-animator', {
+      schema: { phase: { type: 'number', default: 0 } },
+      init: function () { this.carriage = this.el.querySelector('.arm-carriage'); this.verticalMast = this.el.querySelector('.arm-vertical'); this.wrist = this.el.querySelector('.arm-wrist'); },
+      tick: function (time) {
+        const t = time * 0.0016 + this.data.phase;
+        if (this.carriage) this.carriage.object3D.position.z = Math.sin(t) * 0.42;
+        if (this.verticalMast) this.verticalMast.object3D.position.y = 0.22 + Math.cos(t * 2) * 0.24;
+        if (this.wrist) this.wrist.object3D.rotation.z = Math.sin(t * 1.5) * 0.35;
+      }
+    });
+
+    AFRAME.registerComponent('quest-thumbstick-locomotion', {
+      schema: { hand: { type: 'string', default: 'left' }, speed: { type: 'number', default: 0.15 } },
+      init: function () {
+        this.axisX = 0; this.axisY = 0; this.forwardVec = new THREE.Vector3(); this.rightVec = new THREE.Vector3();
+        this.el.addEventListener('thumbstickmoved', (evt) => { this.axisX = evt.detail.x || 0; this.axisY = evt.detail.y || 0; });
+      },
+      tick: function () {
+        const rigEl = document.querySelector('#rig'); const camEl = document.querySelector('#player-camera');
+        if (!rigEl || !camEl) return;
+        if (Math.abs(this.axisX) < 0.12 && Math.abs(this.axisY) < 0.12) return;
+        if (this.data.hand === 'left') {
+          camEl.object3D.getWorldDirection(this.forwardVec); this.forwardVec.y = 0; this.forwardVec.normalize();
+          this.rightVec.set(-this.forwardVec.z, 0, this.forwardVec.x).normalize();
+          const s = this.data.speed * 0.35;
+          rigEl.object3D.position.addScaledVector(this.forwardVec, this.axisY * s);
+          rigEl.object3D.position.addScaledVector(this.rightVec, -this.axisX * s);
+          rigEl.object3D.position.y = 0;
+        } else if (this.data.hand === 'right' && Math.abs(this.axisX) > 0.25) {
+          rigEl.object3D.rotation.y -= this.axisX * 0.028;
+        }
+      }
+    });
+  </script>
+</head>
+<body>
+
+  <!-- SECCIÓN WEB INICIAL: QUIÉNES SOMOS -->
+  <header>
+    <div class="intro-container">
+      <h1 class="logo-title">Sensor<span class="logo-highlight">Tech</span></h1>
+      <h2 class="subtitle">Mantenimiento Predictivo Inteligente</h2>
+      
+      <p class="about-text">
+        Nacido como un proyecto de innovación en la <strong>Universidad Metropolitana de Monterrey</strong>, 
+        SensorTech es un sistema avanzado de monitoreo loT diseñado para optimizar el rendimiento de las líneas 
+        de producción de plástico. Nuestro enfoque de Industria 4.0 nos permite evaluar y analizar en tiempo real 
+        variables operativas críticas, transformando la forma en que se gestiona la maquinaria industrial.
+      </p>
+      
+      <p class="about-text">
+        Mediante la integración de nodos con microcontroladores ESP32 y sensores ambientales BME280, el sistema captura 
+        continuamente la temperatura, presión y humedad del material. Estos datos son procesados por nuestros algoritmos 
+        de Machine Learning para identificar patrones, predecir fallos potenciales y establecer estrategias sólidas de 
+        mantenimiento predictivo. Así, logramos reducir drásticamente las mermas operativas y evitar interrupciones 
+        inesperadas en el proceso de inyección.
+      </p>
+      
+      <div class="features">
+        <span class="feature-chip">Monitoreo IoT ESP32</span>
+        <span class="feature-chip">Machine Learning</span>
+        <span class="feature-chip">Sensores BME280</span>
+        <span class="feature-chip">Reducción de Mermas</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR DONDE VIVE LA REALIDAD VIRTUAL -->
+  <div id="vr-section">
+    <!-- OVERLAY 2D INICIAL PARA DESBLOQUEAR AUDIO -->
+    <div id="vr-start-overlay" onclick="window.SensorTechVR.unlockAudio(); this.style.opacity='0'; setTimeout(() => this.style.display='none', 350);">
+      <div class="overlay-box">
+        <div class="overlay-kicker">PLANTA DE INYECCIÓN INDUSTRIA 4.0 · META QUEST 3S WEBXR</div>
+        <h1 class="overlay-title">Haz clic para iniciar la experiencia VR</h1>
+        <p class="overlay-desc">
+          Al hacer clic se desbloqueará el motor de síntesis de voz en español latino del Robot Guía IA.
+          Usa los thumbsticks de tus mandos (o las teclas W, A, S, D) para recorrer la nave de inyección 
+          y activar las 3 zonas de mantenimiento predictivo SensorTech.
+        </p>
+        <button class="overlay-cta">Haz clic para iniciar la experiencia VR</button>
+      </div>
+    </div>
+
+    <!-- SUBTÍTULOS DINÁMICOS DEL ROBOT GUÍA -->
+    <div id="hud-subtitle">
+      <div id="hud-subtitle-label">ROBOT GUÍA IA SENSORTECH · NARRACIÓN ACTIVA</div>
+      <div id="hud-subtitle-text"></div>
+    </div>
+
+    <!-- LA ESCENA A-FRAME INCRUSTADA -->
+    <a-scene
+      embedded
+      id="sensortech-vr-scene"
+      renderer="antialias: true; colorManagement: true; physicallyCorrectLights: true; highRefreshRate: true"
+      xr-mode-ui="enabled: true"
+      vr-mode-ui="enabled: true"
+      fog="type: exponential; color: #DCE6F2; density: 0.0045"
+    >
+      <a-light type="ambient" color="#D8E6F8" intensity="0.95"></a-light>
+      <a-light type="directional" position="14 26 18" color="#FFFDF8" intensity="1.15"></a-light>
+      <a-light type="point" position="0 7.6 4" color="#F0F9FF" intensity="0.9" distance="26"></a-light>
+      <a-light type="point" position="0 7.6 -8" color="#F0F9FF" intensity="0.95" distance="26"></a-light>
+      <a-light type="point" position="0 7.6 -20" color="#E0F2FE" intensity="1.05" distance="26"></a-light>
+
+      <a-sky color="#CFE4FA"></a-sky>
+
+      <a-entity
+        id="rig"
+        position="0 0 21.5"
+        movement-controls="fly: false; speed: 0.15; controls: gamepad, trackpad, keyboard, touch"
+      >
+        <a-entity id="player-camera" camera position="0 1.65 0" look-controls="pointerLockEnabled: false"></a-entity>
+        <a-entity id="left-controller" tracked-controls="controller: 0; idPrefix: OpenVR" oculus-touch-controls="hand: left" meta-touch-controls="hand: left" laser-controls="hand: left" raycaster="objects: .interactive; far: 12" quest-thumbstick-locomotion="hand: left; speed: 0.15"></a-entity>
+        <a-entity id="right-controller" tracked-controls="controller: 1; idPrefix: OpenVR" oculus-touch-controls="hand: right" meta-touch-controls="hand: right" laser-controls="hand: right" raycaster="objects: .interactive; far: 12" quest-thumbstick-locomotion="hand: right; speed: 0.15"></a-entity>
+      </a-entity>
+
+      <a-entity id="robot-guide" position="0.75 1.7 19.8" follow-player="distance: 1.5; sideOffset: 0.68; heightOffset: 0.02; lerpFactor: 0.04">
+        <a-sphere radius="0.23" material="color: #F8FAFC; roughness: 0.12; metalness: 0.55"></a-sphere>
+        <a-cylinder radius="0.235" height="0.08" material="color: #0F172A; metalness: 0.8; roughness: 0.2"></a-cylinder>
+        <a-sphere position="0 0.02 0.16" radius="0.13" scale="1.15 0.85 0.45" material="color: #020617; roughness: 0.05; metalness: 0.9"></a-sphere>
+        <a-entity class="drone-eye-core" position="0 0.02 0.225">
+          <a-circle radius="0.068" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 1; shader: flat"></a-circle>
+          <a-ring radius-inner="0.075" radius-outer="0.095" material="color: #38BDF8; emissive: #00F0FF; emissiveIntensity: 0.9; shader: flat"></a-ring>
+          <a-circle position="0 0 0.004" radius="0.028" material="color: #FFFFFF; shader: flat"></a-circle>
+        </a-entity>
+        <a-torus class="drone-ring-outer" radius="0.33" radius-tubular="0.012" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.75"></a-torus>
+        <a-torus class="drone-ring-inner" rotation="90 0 0" radius="0.28" radius-tubular="0.01" material="color: #38BDF8; emissive: #0284C7; emissiveIntensity: 0.6"></a-torus>
+        <a-ring position="0 -0.24 0" rotation="90 0 0" radius-inner="0.06" radius-outer="0.15" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.9; side: double; shader: flat"></a-ring>
+        <a-entity position="0 0.44 0">
+          <a-plane width="0.92" height="0.18" material="color: #040D1A; opacity: 0.85; transparent: true; shader: flat"></a-plane>
+          <a-text value="GUÍA IA · SENSORTECH" align="center" width="2.1" wrap-count="24" color="#00F0FF" position="0 0 0.01"></a-text>
+        </a-entity>
+      </a-entity>
+
+      <a-entity id="exterior-zone">
+        <a-plane position="-14 0 23.5" rotation="-90 0 0" width="21.6" height="23" material="color: #2E7D32; roughness: 0.9"></a-plane>
+        <a-plane position="14 0 23.5" rotation="-90 0 0" width="21.6" height="23" material="color: #2E7D32; roughness: 0.9"></a-plane>
+        <a-box position="-4.5 0.35 16.5" width="1.6" height="0.7" depth="6.5" material="color: #1B5E20; roughness: 0.85"></a-box>
+        <a-box position="4.5 0.35 16.5" width="1.6" height="0.7" depth="6.5" material="color: #1B5E20; roughness: 0.85"></a-box>
+        <a-plane position="0 0.005 23.5" rotation="-90 0 0" width="6.4" height="23" material="color: #CBD5E1; roughness: 0.45; metalness: 0.1"></a-plane>
+        <a-plane position="-2.8 0.01 22" rotation="-90 0 0" width="0.15" height="20" material="color: #0284C7; emissive: #0284C7; emissiveIntensity: 0.5; shader: flat"></a-plane>
+        <a-plane position="2.8 0.01 22" rotation="-90 0 0" width="0.15" height="20" material="color: #0284C7; emissive: #0284C7; emissiveIntensity: 0.5; shader: flat"></a-plane>
+        <a-cylinder position="-2.95 0.45 19" radius="0.09" height="0.9" material="color: #1E293B; metalness: 0.7"></a-cylinder>
+        <a-sphere position="-2.95 0.95 19" radius="0.11" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9"></a-sphere>
+        <a-cylinder position="2.95 0.45 19" radius="0.09" height="0.9" material="color: #1E293B; metalness: 0.7"></a-cylinder>
+        <a-sphere position="2.95 0.95 19" radius="0.11" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9"></a-sphere>
+        <a-box position="-9.1 4.6 12.0" width="13.4" height="9.2" depth="0.55" material="color: #F8FAFC; roughness: 0.25"></a-box>
+        <a-box position="9.1 4.6 12.0" width="13.4" height="9.2" depth="0.55" material="color: #F8FAFC; roughness: 0.25"></a-box>
+        <a-box position="0 6.7 12.0" width="4.8" height="5.0" depth="0.55" material="color: #F8FAFC; roughness: 0.25"></a-box>
+        <a-box position="-9.1 7.8 12.3" width="13.4" height="1.15" depth="0.12" material="color: #0A3D91; roughness: 0.2; metalness: 0.3"></a-box>
+        <a-box position="9.1 7.8 12.3" width="13.4" height="1.15" depth="0.12" material="color: #0A3D91; roughness: 0.2; metalness: 0.3"></a-box>
+        <a-box position="0 7.8 12.3" width="5.2" height="1.15" depth="0.18" material="color: #0A3D91; roughness: 0.2; metalness: 0.3"></a-box>
+        <a-box position="-9.1 5.6 12.3" width="13.4" height="0.85" depth="0.12" material="color: #1D4ED8; roughness: 0.2; metalness: 0.25"></a-box>
+        <a-box position="9.1 5.6 12.3" width="13.4" height="0.85" depth="0.12" material="color: #1D4ED8; roughness: 0.2; metalness: 0.25"></a-box>
+        <a-box position="0 5.6 12.3" width="5.2" height="0.85" depth="0.18" material="color: #1D4ED8; roughness: 0.2; metalness: 0.25"></a-box>
+        <a-box position="-9.1 2.8 12.29" width="10.2" height="3.2" depth="0.06" material="color: #0F294A; roughness: 0.08; metalness: 0.85"></a-box>
+        <a-box position="9.1 2.8 12.29" width="10.2" height="3.2" depth="0.06" material="color: #0F294A; roughness: 0.08; metalness: 0.85"></a-box>
+        <a-box position="-14.8 4.7 12.45" width="1.15" height="9.4" depth="0.95" material="color: #F8FAFC; roughness: 0.2"></a-box>
+        <a-box position="-8.8 4.7 12.45" width="1.05" height="9.4" depth="0.85" material="color: #F8FAFC; roughness: 0.2"></a-box>
+        <a-box position="-2.8 4.7 12.55" width="0.95" height="9.4" depth="1.05" material="color: #0A3D91; roughness: 0.2; metalness: 0.3"></a-box>
+        <a-box position="2.8 4.7 12.55" width="0.95" height="9.4" depth="1.05" material="color: #0A3D91; roughness: 0.2; metalness: 0.3"></a-box>
+        <a-box position="8.8 4.7 12.45" width="1.05" height="9.4" depth="0.85" material="color: #F8FAFC; roughness: 0.2"></a-box>
+        <a-box position="14.8 4.7 12.45" width="1.15" height="9.4" depth="0.95" material="color: #F8FAFC; roughness: 0.2"></a-box>
+        <a-box position="0 4.45 13.1" width="6.4" height="0.32" depth="1.8" material="color: #0F172A; metalness: 0.7"></a-box>
+        <a-text value="SENSORTECH INDUSTRIES" position="0 7.85 12.45" align="center" width="14" wrap-count="24" color="#FFFFFF"></a-text>
+        <a-text value="PLANTA DE INYECCIÓN DE PLÁSTICO · INDUSTRIA 4.0" position="0 6.72 12.45" align="center" width="9.5" wrap-count="46" color="#0F172A"></a-text>
+        <a-text value="ACCESO NAVE 8" position="0 5.62 12.45" align="center" width="8.5" wrap-count="24" color="#00F0FF"></a-text>
+        <a-entity position="-2.32 2.0 12.15" rotation="0 -68 0">
+          <a-box position="0.95 0 0" width="1.9" height="3.9" depth="0.08" material="color: #0284C7; opacity: 0.45; transparent: true; metalness: 0.8; roughness: 0.1"></a-box>
+          <a-box position="0.95 0 0" width="1.94" height="3.94" depth="0.05" material="color: #E2E8F0; wireframe: true"></a-box>
+        </a-entity>
+        <a-entity position="2.32 2.0 12.15" rotation="0 68 0">
+          <a-box position="-0.95 0 0" width="1.9" height="3.9" depth="0.08" material="color: #0284C7; opacity: 0.45; transparent: true; metalness: 0.8; roughness: 0.1"></a-box>
+          <a-box position="-0.95 0 0" width="1.94" height="3.94" depth="0.05" material="color: #E2E8F0; wireframe: true"></a-box>
+        </a-entity>
+      </a-entity>
+
+      <a-entity id="interior-factory-hall">
+        <a-plane position="0 0.004 -8.0" rotation="-90 0 0" width="5.2" height="40.2" material="color: #1565C0; roughness: 0.1; metalness: 0.2"></a-plane>
+        <a-plane position="-2.62 0.008 -8.0" rotation="-90 0 0" width="0.18" height="40.2" material="color: #FFD600; roughness: 0.18; metalness: 0.1"></a-plane>
+        <a-plane position="2.62 0.008 -8.0" rotation="-90 0 0" width="0.18" height="40.2" material="color: #FFD600; roughness: 0.18; metalness: 0.1"></a-plane>
+        <a-plane position="-9.15 0.002 -8.0" rotation="-90 0 0" width="12.9" height="40.2" material="color: #788696; roughness: 0.14; metalness: 0.2"></a-plane>
+        <a-plane position="9.15 0.002 -8.0" rotation="-90 0 0" width="12.9" height="40.2" material="color: #788696; roughness: 0.14; metalness: 0.2"></a-plane>
+        <a-plane position="-2 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+        <a-plane position="-1.2 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+        <a-plane position="-0.3999999999999999 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+        <a-plane position="0.40000000000000013 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+        <a-plane position="1.2000000000000002 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+        <a-plane position="2 0.009 7.2" rotation="-90 0 0" width="0.45" height="1.6" material="color: #F8FAFC; roughness: 0.2"></a-plane>
+
+        <a-entity position="-2.82 0 9.2">
+          <a-cylinder position="0 0.48 -1.2" radius="0.045" height="0.96" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.48 1.2" radius="0.045" height="0.96" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.92 0" rotation="90 0 0" radius="0.045" height="2.45" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.48 0" rotation="90 0 0" radius="0.035" height="2.45" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+        </a-entity>
+        <a-entity position="2.82 0 9.2">
+          <a-cylinder position="0 0.48 -1.2" radius="0.045" height="0.96" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.48 1.2" radius="0.045" height="0.96" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.92 0" rotation="90 0 0" radius="0.045" height="2.45" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0 0.48 0" rotation="90 0 0" radius="0.035" height="2.45" material="color: #FFD600; roughness: 0.2"></a-cylinder>
+        </a-entity>
+
+        <a-box position="-15.4 4.6 -8.0" width="0.4" height="9.2" depth="40.4" material="color: #F1F5F9; roughness: 0.4"></a-box>
+        <a-box position="15.4 4.6 -8.0" width="0.4" height="9.2" depth="40.4" material="color: #F1F5F9; roughness: 0.4"></a-box>
+        <a-box position="0 4.6 -28.0" width="31.2" height="9.2" depth="0.4" material="color: #E2E8F0; roughness: 0.4"></a-box>
+        <a-plane position="0 9.15 -8.0" rotation="90 0 0" width="31.2" height="40.4" material="color: #F8FAFC; roughness: 0.4"></a-plane>
+
+        <!-- Columnas Estructurales -->
+        <a-box position="-14.8 4.5 10" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 10" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 10" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 10"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 10"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 10"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        
+        <a-box position="-14.8 4.5 4" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 4" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 4" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 4"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 4"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 4"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-box position="-14.8 4.5 -2" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 -2" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 -2" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 -2"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 -2"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 -2"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-box position="-14.8 4.5 -8" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 -8" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 -8" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 -8"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 -8"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 -8"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-box position="-14.8 4.5 -14" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 -14" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 -14" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 -14"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 -14"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 -14"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-box position="-14.8 4.5 -20" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 -20" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 -20" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 -20"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 -20"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 -20"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-box position="-14.8 4.5 -26" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="14.8 4.5 -26" width="0.75" height="9.0" depth="0.75" material="color: #F8FAFC; roughness: 0.35"></a-box>
+        <a-box position="0 8.65 -26" width="30.2" height="0.45" depth="0.38" material="color: #F8FAFC; roughness: 0.3; metalness: 0.15"></a-box>
+        <a-entity position="-6.5 8.25 -26"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="0 8.25 -26"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+        <a-entity position="6.5 8.25 -26"><a-cylinder radius="0.38" height="0.14" material="color: #1E293B; metalness: 0.6"></a-cylinder><a-circle position="0 -0.08 0" rotation="90 0 0" radius="0.34" material="color: #FFFFFF; emissive: #FFFFFF; emissiveIntensity: 1; shader: flat"></a-circle></a-entity>
+
+        <a-entity position="0 7.45 -9.5">
+          <a-box position="0 0 0" width="28.8" height="0.55" depth="0.65" material="color: #F59E0B; roughness: 0.25; metalness: 0.4"></a-box>
+          <a-box position="0 0.25 0.8" width="28.8" height="0.45" depth="0.5" material="color: #F59E0B; roughness: 0.25; metalness: 0.4"></a-box>
+          <a-box position="3.2 -0.35 0.4" width="1.2" height="0.45" depth="1.3" material="color: #DC2626; metalness: 0.6"></a-box>
+          <a-text value="PUENTE GRUA 10 TON · SENSORTECH" position="0 0 0.35" align="center" width="9" color="#0F172A"></a-text>
+        </a-entity>
+
+        <a-box position="-3.4 5.8 -8.0" width="0.35" height="0.18" depth="38" material="color: #1D4ED8; metalness: 0.5; roughness: 0.25"></a-box>
+        <a-box position="3.4 5.8 -8.0" width="0.35" height="0.18" depth="38" material="color: #1D4ED8; metalness: 0.5; roughness: 0.25"></a-box>
+        <a-cylinder position="-3.8 6.1 -8.0" rotation="90 0 0" radius="0.08" height="38" material="color: #CBD5E1; metalness: 0.85; roughness: 0.15"></a-cylinder>
+        <a-cylinder position="3.8 6.1 -8.0" rotation="90 0 0" radius="0.08" height="38" material="color: #CBD5E1; metalness: 0.85; roughness: 0.15"></a-cylinder>
+
+        <!-- MAQUINARIA: ESTACIONES DE INYECCIÓN -->
+        <a-entity id="machine-INY-01" position="-7.2 0 3.2" rotation="0 0 0">
+          <a-plane position="0 0.008 0" rotation="-90 0 0" width="5.8" height="3.2" material="color: #FFD600; shader: flat"></a-plane>
+          <a-plane position="0 0.011 0" rotation="-90 0 0" width="5.56" height="2.96" material="color: #64748B; roughness: 0.2; metalness: 0.2"></a-plane>
+          <a-box position="0 0.52 0" width="5.2" height="1.04" depth="1.85" material="color: #0B2E6B; roughness: 0.25; metalness: 0.35"></a-box>
+          <a-box position="-1.2 0.52 0.94" width="1.8" height="0.65" depth="0.04" material="color: #1E293B; roughness: 0.5; metalness: 0.6"></a-box>
+          <a-box position="1.3 0.52 0.94" width="1.8" height="0.65" depth="0.04" material="color: #1E293B; roughness: 0.5; metalness: 0.6"></a-box>
+          <a-plane position="0.4 0.65 0.95" width="0.22" height="0.28" material="color: #FACC15; shader: flat"></a-plane>
+          <a-plane position="1.9 0.65 0.95" width="0.22" height="0.28" material="color: #FACC15; shader: flat"></a-plane>
+          <a-box position="-1.35 1.68 0" width="2.35" height="1.32" depth="1.78" material="color: #F8FAFC; roughness: 0.2; metalness: 0.15"></a-box>
+          <a-box position="-1.35 1.68 0.90" width="1.75" height="0.72" depth="0.03" material="color: #1D4ED8; roughness: 0.2"></a-box>
+          <a-box position="0.15 1.68 0.88" width="1.15" height="1.28" depth="0.08" material="color: #1E40AF; roughness: 0.2; metalness: 0.3"></a-box>
+          <a-box position="0.15 1.72 0.93" width="0.88" height="0.82" depth="0.02" material="color: #0F172A; opacity: 0.65; transparent: true; roughness: 0.08; metalness: 0.8"></a-box>
+          <a-box position="-0.35 1.68 0" width="0.24" height="1.1" depth="1.35" material="color: #334155; metalness: 0.7; roughness: 0.25"></a-box>
+          <a-box position="0.55 1.68 0" width="0.24" height="1.1" depth="1.35" material="color: #334155; metalness: 0.7; roughness: 0.25"></a-box>
+          <a-box position="0.10 1.68 0" width="0.42" height="0.76" depth="0.86" material="color: #94A3B8; metalness: 0.85; roughness: 0.18"></a-box>
+          <a-cylinder position="-0.45 2.05 0.52" rotation="0 0 90" radius="0.045" height="2.1" material="color: #E2E8F0; metalness: 0.92; roughness: 0.08"></a-cylinder>
+          <a-cylinder position="-0.45 2.05 -0.52" rotation="0 0 90" radius="0.045" height="2.1" material="color: #E2E8F0; metalness: 0.92; roughness: 0.08"></a-cylinder>
+          <a-box position="1.72 1.55 0" width="1.65" height="1.05" depth="1.52" material="color: #F1F5F9; roughness: 0.22; metalness: 0.15"></a-box>
+          <a-box position="1.72 1.25 0.77" width="1.55" height="0.32" depth="0.04" material="color: #1D4ED8; roughness: 0.25"></a-box>
+          <a-cylinder position="1.05 1.72 0" rotation="0 0 90" radius="0.22" height="1.45" material="color: #64748B; metalness: 0.8; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0.65 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="0.92 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="1.18 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="2.15 1.72 0" rotation="0 0 90" radius="0.28" height="0.58" material="color: #0F172A; metalness: 0.6; roughness: 0.3"></a-cylinder>
+          <a-entity position="1.35 2.25 0">
+            <a-box position="0 0.18 0" width="0.28" height="0.36" depth="0.28" material="color: #CBD5E1; metalness: 0.75; roughness: 0.2"></a-box>
+            <a-cone position="0 0.56 0" radius-bottom="0.09" radius-top="0.42" height="0.48" material="color: #E2E8F0; metalness: 0.88; roughness: 0.14"></a-cone>
+            <a-cylinder position="0 1.15 0" radius="0.42" height="0.72" material="color: #F1F5F9; metalness: 0.9; roughness: 0.12"></a-cylinder>
+            <a-cylinder position="0 1.56 0" radius="0.45" height="0.08" material="color: #1E3A8A; metalness: 0.5; roughness: 0.3"></a-cylinder>
+            <a-cylinder position="0 1.78 0" radius="0.18" height="0.36" material="color: #CBD5E1; metalness: 0.85; roughness: 0.15"></a-cylinder>
+          </a-entity>
+          <a-entity position="-0.25 2.35 0" robot-arm-animator="phase: 0">
+            <a-cylinder position="0 0.22 0" radius="0.22" height="0.44" material="color: #111827; metalness: 0.7; roughness: 0.3"></a-cylinder>
+            <a-box position="0 0.52 0" width="0.24" height="0.18" depth="1.65" material="color: #1E293B; metalness: 0.8; roughness: 0.2"></a-box>
+            <a-entity class="arm-carriage" position="0 0.65 0">
+              <a-box position="0 0.18 0" width="0.32" height="0.36" depth="0.32" material="color: #DC2626; metalness: 0.45; roughness: 0.25"></a-box>
+              <a-cylinder position="0 0.55 0.12" rotation="25 0 0" radius="0.09" height="0.75" material="color: #DC2626; metalness: 0.45; roughness: 0.25"></a-cylinder>
+              <a-sphere position="0 0.88 0.26" radius="0.12" material="color: #0F172A; metalness: 0.7"></a-sphere>
+              <a-entity class="arm-vertical" position="0 0.35 0.32">
+                <a-box position="0 0 0" width="0.09" height="0.95" depth="0.09" material="color: #E11D48; metalness: 0.5; roughness: 0.2"></a-box>
+                <a-entity class="arm-wrist" position="0 -0.48 0">
+                  <a-box position="0 -0.08 0" width="0.26" height="0.08" depth="0.18" material="color: #0F172A; metalness: 0.8"></a-box>
+                  <a-cylinder position="0 -0.18 0" radius="0.08" height="0.12" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.4"></a-cylinder>
+                </a-entity>
+              </a-entity>
+            </a-entity>
+          </a-entity>
+          <a-box position="0.82 1.65 0.92" width="0.46" height="0.62" depth="0.12" material="color: #1E293B; metalness: 0.5"></a-box>
+          <a-plane position="0.82 1.72 0.99" width="0.36" height="0.28" material="color: #0284C7; emissive: #0284C7; emissiveIntensity: 0.5; shader: flat"></a-plane>
+          <a-cylinder position="-0.95 2.48 0.75" radius="0.04" height="0.32" material="color: #CBD5E1"></a-cylinder>
+          <a-cylinder position="-0.95 2.68 0.75" radius="0.055" height="0.12" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.85"></a-cylinder>
+          <a-text value="INY-01 · JM398-MK6" position="-1.35 2.12 0.92" align="center" width="4.2" wrap-count="28" color="#0F172A"></a-text>
+          <a-entity position="0.95 2.02 0.78">
+            <a-box position="0 0 0" width="0.42" height="0.28" depth="0.18" material="color: #0F172A; metalness: 0.7; roughness: 0.2"></a-box>
+            <a-box position="-0.08 0 0.095" width="0.18" height="0.18" depth="0.02" material="color: #064E3B; roughness: 0.3"></a-box>
+            <a-box position="-0.08 0.02 0.11" width="0.11" height="0.11" depth="0.015" material="color: #CBD5E1; metalness: 0.9"></a-box>
+            <a-box position="0.11 0.04 0.095" width="0.10" height="0.10" depth="0.02" material="color: #7C3AED; emissive: #6D28D9; emissiveIntensity: 0.4"></a-box>
+            <a-cylinder position="0.11 -0.06 0.095" rotation="90 0 0" radius="0.04" height="0.04" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.85"></a-cylinder>
+            <a-ring position="0 0 0.11" radius-inner="0.22" radius-outer="0.25" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9; shader: flat"></a-ring>
+          </a-entity>
+        </a-entity>
+
+        <a-entity id="machine-INY-02" position="-7.2 0 -5.5" rotation="0 0 0">
+          <a-plane position="0 0.008 0" rotation="-90 0 0" width="5.8" height="3.2" material="color: #FFD600; shader: flat"></a-plane>
+          <a-plane position="0 0.011 0" rotation="-90 0 0" width="5.56" height="2.96" material="color: #64748B; roughness: 0.2; metalness: 0.2"></a-plane>
+          <a-box position="0 0.52 0" width="5.2" height="1.04" depth="1.85" material="color: #0B2E6B; roughness: 0.25; metalness: 0.35"></a-box>
+          <a-box position="-1.2 0.52 0.94" width="1.8" height="0.65" depth="0.04" material="color: #1E293B; roughness: 0.5; metalness: 0.6"></a-box>
+          <a-box position="1.3 0.52 0.94" width="1.8" height="0.65" depth="0.04" material="color: #1E293B; roughness: 0.5; metalness: 0.6"></a-box>
+          <a-plane position="0.4 0.65 0.95" width="0.22" height="0.28" material="color: #FACC15; shader: flat"></a-plane>
+          <a-plane position="1.9 0.65 0.95" width="0.22" height="0.28" material="color: #FACC15; shader: flat"></a-plane>
+          <a-box position="-1.35 1.68 0" width="2.35" height="1.32" depth="1.78" material="color: #F8FAFC; roughness: 0.2; metalness: 0.15"></a-box>
+          <a-box position="-1.35 1.68 0.90" width="1.75" height="0.72" depth="0.03" material="color: #1D4ED8; roughness: 0.2"></a-box>
+          <a-box position="0.15 1.68 0.88" width="1.15" height="1.28" depth="0.08" material="color: #1E40AF; roughness: 0.2; metalness: 0.3"></a-box>
+          <a-box position="0.15 1.72 0.93" width="0.88" height="0.82" depth="0.02" material="color: #0F172A; opacity: 0.65; transparent: true; roughness: 0.08; metalness: 0.8"></a-box>
+          <a-box position="-0.35 1.68 0" width="0.24" height="1.1" depth="1.35" material="color: #334155; metalness: 0.7; roughness: 0.25"></a-box>
+          <a-box position="0.55 1.68 0" width="0.24" height="1.1" depth="1.35" material="color: #334155; metalness: 0.7; roughness: 0.25"></a-box>
+          <a-box position="0.10 1.68 0" width="0.42" height="0.76" depth="0.86" material="color: #94A3B8; metalness: 0.85; roughness: 0.18"></a-box>
+          <a-cylinder position="-0.45 2.05 0.52" rotation="0 0 90" radius="0.045" height="2.1" material="color: #E2E8F0; metalness: 0.92; roughness: 0.08"></a-cylinder>
+          <a-cylinder position="-0.45 2.05 -0.52" rotation="0 0 90" radius="0.045" height="2.1" material="color: #E2E8F0; metalness: 0.92; roughness: 0.08"></a-cylinder>
+          <a-box position="1.72 1.55 0" width="1.65" height="1.05" depth="1.52" material="color: #F1F5F9; roughness: 0.22; metalness: 0.15"></a-box>
+          <a-box position="1.72 1.25 0.77" width="1.55" height="0.32" depth="0.04" material="color: #1D4ED8; roughness: 0.25"></a-box>
+          <a-cylinder position="1.05 1.72 0" rotation="0 0 90" radius="0.22" height="1.45" material="color: #64748B; metalness: 0.8; roughness: 0.2"></a-cylinder>
+          <a-cylinder position="0.65 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="0.92 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="1.18 1.72 0" rotation="0 0 90" radius="0.24" height="0.12" material="color: #EA580C; emissive: #9A3412; emissiveIntensity: 0.35; metalness: 0.5"></a-cylinder>
+          <a-cylinder position="2.15 1.72 0" rotation="0 0 90" radius="0.28" height="0.58" material="color: #0F172A; metalness: 0.6; roughness: 0.3"></a-cylinder>
+          <a-entity position="1.35 2.25 0">
+            <a-box position="0 0.18 0" width="0.28" height="0.36" depth="0.28" material="color: #CBD5E1; metalness: 0.75; roughness: 0.2"></a-box>
+            <a-cone position="0 0.56 0" radius-bottom="0.09" radius-top="0.42" height="0.48" material="color: #E2E8F0; metalness: 0.88; roughness: 0.14"></a-cone>
+            <a-cylinder position="0 1.15 0" radius="0.42" height="0.72" material="color: #F1F5F9; metalness: 0.9; roughness: 0.12"></a-cylinder>
+            <a-cylinder position="0 1.56 0" radius="0.45" height="0.08" material="color: #1E3A8A; metalness: 0.5; roughness: 0.3"></a-cylinder>
+            <a-cylinder position="0 1.78 0" radius="0.18" height="0.36" material="color: #CBD5E1; metalness: 0.85; roughness: 0.15"></a-cylinder>
+          </a-entity>
+          <a-entity position="-0.25 2.35 0" robot-arm-animator="phase: 1.4">
+            <a-cylinder position="0 0.22 0" radius="0.22" height="0.44" material="color: #111827; metalness: 0.7; roughness: 0.3"></a-cylinder>
+            <a-box position="0 0.52 0" width="0.24" height="0.18" depth="1.65" material="color: #1E293B; metalness: 0.8; roughness: 0.2"></a-box>
+            <a-entity class="arm-carriage" position="0 0.65 0">
+              <a-box position="0 0.18 0" width="0.32" height="0.36" depth="0.32" material="color: #DC2626; metalness: 0.45; roughness: 0.25"></a-box>
+              <a-cylinder position="0 0.55 0.12" rotation="25 0 0" radius="0.09" height="0.75" material="color: #DC2626; metalness: 0.45; roughness: 0.25"></a-cylinder>
+              <a-sphere position="0 0.88 0.26" radius="0.12" material="color: #0F172A; metalness: 0.7"></a-sphere>
+              <a-entity class="arm-vertical" position="0 0.35 0.32">
+                <a-box position="0 0 0" width="0.09" height="0.95" depth="0.09" material="color: #E11D48; metalness: 0.5; roughness: 0.2"></a-box>
+                <a-entity class="arm-wrist" position="0 -0.48 0">
+                  <a-box position="0 -0.08 0" width="0.26" height="0.08" depth="0.18" material="color: #0F172A; metalness: 0.8"></a-box>
+                  <a-cylinder position="0 -0.18 0" radius="0.08" height="0.12" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.4"></a-cylinder>
+                </a-entity>
+              </a-entity>
+            </a-entity>
+          </a-entity>
+          <a-box position="0.82 1.65 0.92" width="0.46" height="0.62" depth="0.12" material="color: #1E293B; metalness: 0.5"></a-box>
+          <a-plane position="0.82 1.72 0.99" width="0.36" height="0.28" material="color: #0284C7; emissive: #0284C7; emissiveIntensity: 0.5; shader: flat"></a-plane>
+          <a-cylinder position="-0.95 2.48 0.75" radius="0.04" height="0.32" material="color: #CBD5E1"></a-cylinder>
+          <a-cylinder position="-0.95 2.68 0.75" radius="0.055" height="0.12" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.85"></a-cylinder>
+          <a-text value="INY-02 · MA8000-IOT" position="-1.35 2.12 0.92" align="center" width="4.2" wrap-count="28" color="#0F172A"></a-text>
+          <a-entity position="0.95 2.02 0.78">
+            <a-box position="0 0 0" width="0.42" height="0.28" depth="0.18" material="color: #0F172A; metalness: 0.7; roughness: 0.2"></a-box>
+            <a-box position="-0.08 0 0.095" width="0.18" height="0.18" depth="0.02" material="color: #064E3B; roughness: 0.3"></a-box>
+            <a-box position="-0.08 0.02 0.11" width="0.11" height="0.11" depth="0.015" material="color: #CBD5E1; metalness: 0.9"></a-box>
+            <a-box position="0.11 0.04 0.095" width="0.10" height="0.10" depth="0.02" material="color: #7C3AED; emissive: #6D28D9; emissiveIntensity: 0.4"></a-box>
+            <a-cylinder position="0.11 -0.06 0.095" rotation="90 0 0" radius="0.04" height="0.04" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.85"></a-cylinder>
+            <a-ring position="0 0 0.11" radius-inner="0.22" radius-outer="0.25" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9; shader: flat"></a-ring>
+          </a-entity>
+        </a-entity>
+
+        <a-entity id="featured-iot-station" position="-3.8675 0 -5.5" rotation="0 90 0">
+          <a-cylinder position="0 0.04 0" radius="0.38" height="0.08" material="color: #0F172A; metalness: 0.7"></a-cylinder>
+          <a-cylinder position="0 0.62 0" radius="0.08" height="1.15" material="color: #1E293B; metalness: 0.8"></a-cylinder>
+          <a-entity position="0 1.18 0.15" rotation="-22 0 0">
+            <a-box position="0 0 0" width="0.92" height="0.58" depth="0.08" material="color: #091526; metalness: 0.6; roughness: 0.2"></a-box>
+            <a-box position="0 0 -0.01" width="0.96" height="0.62" depth="0.04" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.6"></a-box>
+            <a-box position="-0.24 0.05 0.05" width="0.32" height="0.38" depth="0.03" material="color: #111827"></a-box>
+            <a-box position="-0.24 0.09 0.07" width="0.22" height="0.22" depth="0.02" material="color: #E2E8F0; metalness: 0.9; roughness: 0.1"></a-box>
+            <a-sphere position="-0.32 -0.08 0.075" radius="0.02" material="color: #00E676; emissive: #00E676; emissiveIntensity: 1"></a-sphere>
+            <a-sphere position="-0.16 -0.08 0.075" radius="0.02" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 1"></a-sphere>
+            <a-text value="ESP32 WiFi/BLE" position="-0.24 -0.19 0.06" align="center" width="1.65" wrap-count="22" color="#00F0FF"></a-text>
+            <a-box position="0.18 0.11 0.05" width="0.24" height="0.18" depth="0.03" material="color: #6D28D9"></a-box>
+            <a-box position="0.18 0.11 0.07" width="0.09" height="0.09" depth="0.02" material="color: #CBD5E1; metalness: 0.95"></a-box>
+            <a-text value="BME280 (T/P/H)" position="0.18 -0.02 0.06" align="center" width="1.55" wrap-count="22" color="#38BDF8"></a-text>
+            <a-box position="0.18 -0.15 0.05" width="0.26" height="0.14" depth="0.03" material="color: #047857"></a-box>
+            <a-cylinder position="0.18 -0.15 0.075" rotation="90 0 0" radius="0.045" height="0.03" material="color: #FBBF24; emissive: #F59E0B; emissiveIntensity: 0.6"></a-cylinder>
+            <a-text value="VIBRACION + AMP" position="0.18 -0.25 0.06" align="center" width="1.55" wrap-count="22" color="#FBBF24"></a-text>
+          </a-entity>
+          <a-entity position="0 1.95 0">
+            <a-box position="0 0 -0.04" width="1.38" height="1.38" depth="0.06" material="color: #0F172A; metalness: 0.7"></a-box>
+            <a-plane position="0 0 0" width="1.3" height="1.3" iot-hmi-screen></a-plane>
+          </a-entity>
+        </a-entity>
+
+        <a-entity id="central-dashboard-wall" position="0 0 -24.8">
+          <a-box position="0 0.18 0" width="12.6" height="0.36" depth="2.4" material="color: #0F172A; metalness: 0.6; roughness: 0.2"></a-box>
+          <a-box position="0 0.37 1.18" width="12.6" height="0.04" depth="0.06" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.85"></a-box>
+          <a-box position="0 3.25 -0.18" width="7.9" height="4.85" depth="0.22" material="color: #091326; metalness: 0.8; roughness: 0.2"></a-box>
+          <a-box position="0 3.25 -0.14" width="7.66" height="4.62" depth="0.18" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.65"></a-box>
+          <a-plane id="main-ml-dashboard-screen" position="0 3.25 -0.02" width="7.5" height="4.45" high-res-dashboard></a-plane>
+
+          <a-entity position="-4.95 2.1 0.15">
+            <a-box width="1.35" height="3.5" depth="1.1" material="color: #090D16; metalness: 0.8; roughness: 0.2"></a-box>
+            <a-plane position="0 0.8 0.56" width="1.1" height="0.12" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-plane position="0 0.4 0.56" width="1.1" height="0.12" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-plane position="0 0.0 0.56" width="1.1" height="0.12" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-text value="SERVIDOR ML #01\nCLUSTER GPU/IOT" position="0 1.35 0.57" align="center" width="2.8" color="#F8FAFC"></a-text>
+          </a-entity>
+
+          <a-entity position="4.95 2.1 0.15">
+            <a-box width="1.35" height="3.5" depth="1.1" material="color: #090D16; metalness: 0.8; roughness: 0.2"></a-box>
+            <a-plane position="0 0.8 0.56" width="1.1" height="0.12" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-plane position="0 0.4 0.56" width="1.1" height="0.12" material="color: #38BDF8; emissive: #38BDF8; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-plane position="0 0.0 0.56" width="1.1" height="0.12" material="color: #FBBF24; emissive: #FBBF24; emissiveIntensity: 0.9; shader: flat"></a-plane>
+            <a-text value="SERVIDOR ML #02\nBROKER MQTT/TLS" position="0 1.35 0.57" align="center" width="2.8" color="#F8FAFC"></a-text>
+          </a-entity>
+        </a-entity>
+
+        <!-- TRIGGERS NARRATIVOS -->
+        <a-entity id="trigger-punto-1" position="0 0 9.5" proximity-trigger="pointId: punto-1; radius: 2.8; text: Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech, nuestro sistema avanzado de mantenimiento predictivo diseñado para optimizar las máquinas de inyección de plástico.">
+          <a-cylinder position="0 1.2 0" radius="2.8" height="2.4" visible="false"></a-cylinder>
+          <a-ring position="0 0.015 0" rotation="-90 0 0" radius-inner="1.15" radius-outer="1.32" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.85; shader: flat"></a-ring>
+          <a-text value="PUNTO 01 · ENTRADA PLANTA 4.0" position="0 0.04 1.55" rotation="-90 0 0" align="center" width="4.2" color="#FFFFFF"></a-text>
+        </a-entity>
+
+        <a-entity id="trigger-punto-2" position="-0.9 0 -5.5" proximity-trigger="pointId: punto-2; radius: 2.9; text: Esta es una de nuestras estaciones de inyección. Como puedes ver, cuenta con módulos sensoriales compactos instalados. Estos dispositivos, basados en un ESP32, monitorean continuamente variables críticas como la temperatura, presión y humedad a través de un sensor BME280, además de analizar el consumo de corriente y vibración. Esto nos permite detectar comportamientos anómalos al instante.">
+          <a-cylinder position="0 1.2 0" radius="2.9" height="2.4" visible="false"></a-cylinder>
+          <a-ring position="0 0.015 0" rotation="-90 0 0" radius-inner="1.15" radius-outer="1.32" material="color: #38BDF8; emissive: #38BDF8; emissiveIntensity: 0.9; shader: flat"></a-ring>
+          <a-text value="PUNTO 02 · SENSOR IOT ESP32 + BME280" position="0 0.04 1.55" rotation="-90 0 0" align="center" width="4.5" color="#FFFFFF"></a-text>
+        </a-entity>
+
+        <a-entity id="trigger-punto-3" position="0 0 -19.5" proximity-trigger="pointId: punto-3; radius: 3.1; text: Toda la información capturada en la planta viaja a nuestro servidor central. Aquí, algoritmos de Machine Learning interpretan los patrones operativos. Al predecir desviaciones críticas en la temperatura o picos inusuales de vibración, el sistema genera alertas tempranas. Esto transforma nuestro proceso: pasamos de reaccionar a problemas, a lograr un mantenimiento predictivo eficiente, reduciendo mermas y evitando fallas inesperadas.">
+          <a-cylinder position="0 1.2 0" radius="3.1" height="2.4" visible="false"></a-cylinder>
+          <a-torus position="0 0.03 0" rotation="90 0 0" radius="1.85" radius-tubular="0.045" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 1"></a-torus>
+          <a-ring position="0 0.018 0" rotation="-90 0 0" radius-inner="1.45" radius-outer="1.75" material="color: #00E676; emissive: #00E676; emissiveIntensity: 0.95; shader: flat"></a-ring>
+          <a-ring position="0 0.016 0" rotation="-90 0 0" radius-inner="0.85" radius-outer="1.05" material="color: #00F0FF; emissive: #00F0FF; emissiveIntensity: 0.85; shader: flat"></a-ring>
+          <a-text value="PUNTO 03 · DASHBOARD MACHINE LEARNING" position="0 0.05 2.15" rotation="-90 0 0" align="center" width="5.2" color="#00F0FF"></a-text>
+        </a-entity>
+      </a-entity>
+    </a-scene>
+  </div>
+
+</body>
+</html>
