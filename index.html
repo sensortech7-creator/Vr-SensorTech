@@ -3,79 +3,52 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SensorTech - Mantenimiento Predictivo Inteligente VR</title>
+  <title>SensorTech - Planta 4.0 VR</title>
   
-  <!-- Librería principal de A-Frame para WebXR -->
+  <!-- Librería de A-Frame -->
   <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
 
-  <style>
-    /* Estilos para la interfaz 2D si se ve desde computadora antes de entrar a VR */
-    body { margin: 0; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    #ui-container {
-      position: absolute;
-      top: 0; left: 0; width: 100%; height: 100%;
-      pointer-events: none;
-      display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
-      z-index: 10;
-    }
-    .header-bar {
-      background-color: #0A192F; color: white; width: 100%; padding: 15px 0; text-align: center;
-      box-shadow: 0 4px 6px rgba(0,0,0,0.3); pointer-events: auto;
-    }
-    .nav-buttons {
-      display: flex; gap: 20px; justify-content: center; margin-top: 10px;
-    }
-    .nav-btn {
-      background: none; border: 1px solid #00E5FF; color: #00E5FF; padding: 8px 15px;
-      border-radius: 5px; cursor: pointer; transition: 0.3s; font-weight: bold;
-    }
-    .nav-btn:hover { background-color: #00E5FF; color: #0A192F; }
-  </style>
-
-  <!-- Script que detecta las interacciones de los mandos de Meta Quest 3S -->
+  <!-- Lógica de interacciones para mandos VR -->
   <script>
     AFRAME.registerComponent('interaccion-mandos', {
       init: function () {
         var el = this.el;
 
-        // ACCIÓN 1: Gatillo frontal (Para tocar botones y pantallas táctiles)
+        // Gatillo frontal
         el.addEventListener('triggerdown', function (evt) {
           var interceptados = el.components.raycaster.intersectedEls;
           if (interceptados.length > 0) {
             var objeto = interceptados[0];
             
-            // Si tocamos el botón de inicio VR
-            if (objeto.id === 'boton-inicio-vr') {
-              objeto.setAttribute('visible', 'false'); // Ocultar el botón
-              objeto.classList.remove('interactivo'); // Desactivar colisión
-              document.querySelector('#bienvenida-texto').setAttribute('visible', 'false');
+            // Ocultar botón cyan de inicio
+            if (objeto.id === 'boton-inicio') {
+              objeto.setAttribute('visible', 'false');
+              objeto.classList.remove('interactivo');
             }
             
-            // Si tocamos una pantalla del monitor IoT
+            // Tocar pantalla IoT
             if (objeto.classList.contains('pantalla-tactil')) {
-              objeto.setAttribute('color', '#00ff00'); // Cambia a verde confirmando lectura
+              objeto.setAttribute('color', '#00ff00');
             }
           }
         });
 
-        // ACCIÓN 2: Botón de agarre lateral (Para mover palancas o interactuar con maquinaria)
+        // Botón de agarre (Grip) para palancas
         el.addEventListener('gripdown', function (evt) {
           var interceptados = el.components.raycaster.intersectedEls;
           if (interceptados.length > 0) {
             var objeto = interceptados[0];
-            
-            // Si agarramos la palanca de la Nave 8
             if (objeto.classList.contains('palanca')) {
-              objeto.setAttribute('rotation', '45 0 0'); // Inclina la palanca
+              objeto.setAttribute('rotation', '45 0 0');
             }
           }
         });
 
-        // ACCIÓN 3: Soltar botón de agarre (La palanca regresa)
+        // Soltar palanca
         el.addEventListener('gripup', function (evt) {
           var palancas = document.querySelectorAll('.palanca');
           palancas.forEach(function(p) {
-            p.setAttribute('rotation', '0 0 0'); // Regresa a posición neutral
+            p.setAttribute('rotation', '0 0 0');
           });
         });
       }
@@ -84,91 +57,50 @@
 </head>
 <body>
 
-  <!-- UI 2D superior (Visible en PC antes de entrar a las gafas) -->
-  <div id="ui-container">
-    <div class="header-bar">
-      <h1 style="margin:0; font-size: 24px; letter-spacing: 2px;">SENSORTECH INDUSTRIES</h1>
-      <p style="margin:5px 0 0 0; font-size: 14px; color: #8892B0;">PLANTA DE INYECCIÓN 4.0 - MANTENIMIENTO PREDICTIVO</p>
-      <div class="nav-buttons">
-        <button class="nav-btn">Monitoreo IoT ESP32</button>
-        <button class="nav-btn">Machine Learning</button>
-        <button class="nav-btn">Sensores BME280</button>
-        <button class="nav-btn">Reducción de Mermas</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Inicia la Escena VR -->
-  <a-scene cursor="rayOrigin: mouse" raycaster="objects: .interactivo" background="color: #E6F2FF">
+  <!-- Escena principal -->
+  <a-scene cursor="rayOrigin: mouse" raycaster="objects: .interactivo" background="color: #e6e6e6">
     
-    <!-- ============================================== -->
-    <!-- CÁMARA Y MANDOS DE META QUEST 3S               -->
-    <!-- ============================================== -->
-    <a-entity id="jugador" position="0 0 4">
+    <!-- Jugador, Cámara y Mandos Meta Quest -->
+    <a-entity position="0 0 4">
       <a-camera position="0 1.6 0"></a-camera>
-
       <!-- Mando Izquierdo -->
-      <a-entity id="mandoIzquierdo" 
-                oculus-touch-controls="hand: left" 
+      <a-entity oculus-touch-controls="hand: left" 
                 raycaster="objects: .interactivo; far: 5; showLine: true" 
-                line="color: #00E5FF; opacity: 0.8"
-                interaccion-mandos>
-      </a-entity>
-
+                line="color: cyan; opacity: 0.8" 
+                interaccion-mandos></a-entity>
       <!-- Mando Derecho -->
-      <a-entity id="mandoDerecho" 
-                oculus-touch-controls="hand: right" 
+      <a-entity oculus-touch-controls="hand: right" 
                 raycaster="objects: .interactivo; far: 5; showLine: true" 
-                line="color: #00E5FF; opacity: 0.8"
-                interaccion-mandos>
-      </a-entity>
+                line="color: cyan; opacity: 0.8" 
+                interaccion-mandos></a-entity>
     </a-entity>
 
-    <!-- ============================================== -->
-    <!-- INTERFAZ VR SENSORTECH (EN 3D PARA LOS MANDOS) -->
-    <!-- ============================================== -->
-    
-    <!-- Texto de Bienvenida -->
-    <a-entity id="bienvenida-texto" position="0 2.5 1">
-      <a-text value="PLANTA DE INYECCION INDUSTRIA 4.0" align="center" color="#0A192F" scale="1.5 1.5 1.5"></a-text>
-      <a-text value="Usa los Thumbsticks de tus mandos para recorrer la nave de\ninyeccion y activar las zonas de mantenimiento predictivo." align="center" position="0 -0.4 0" color="#333333" scale="0.8 0.8 0.8"></a-text>
-    </a-entity>
+    <!-- Piso base -->
+    <a-plane rotation="-90 0 0" width="50" height="50" color="#cccccc"></a-plane>
+    <!-- Camino azul central -->
+    <a-plane rotation="-90 0 0" position="0 0.01 0" width="4" height="20" color="#2A4B7C"></a-plane>
 
-    <!-- Botón interactivo central: Haz clic para iniciar -->
-    <a-box id="boton-inicio-vr" class="interactivo" position="0 1.5 1" width="3.5" height="0.6" depth="0.1" color="#00E5FF">
-      <a-text value="Haz clic con el gatillo para iniciar la experiencia VR" align="center" position="0 0 0.06" color="#0A192F" font="mozillavr"></a-text>
+    <!-- Fachada ACCESO NAVE 8 -->
+    <a-box position="-3.5 2.5 -4" width="2" height="5" depth="1" color="#0A192F"></a-box>
+    <a-box position="3.5 2.5 -4" width="2" height="5" depth="1" color="#0A192F"></a-box>
+    <a-box position="0 5.5 -4" width="9" height="1.5" depth="1" color="#0A192F">
+      <a-text value="ACCESO NAVE 8" align="center" position="0 0 0.51" scale="2 2 2" color="#FFFFFF"></a-text>
     </a-box>
 
-    <!-- ============================================== -->
-    <!-- ENTORNO SIMULADO DE LA NAVE 8                  -->
-    <!-- ============================================== -->
-    
-    <a-entity id="estructura-nave8">
-      <!-- Piso -->
-      <a-plane rotation="-90 0 0" width="30" height="30" color="#B0B0B0"></a-plane>
-      <!-- Camino peatonal -->
-      <a-plane rotation="-90 0 0" position="0 0.01 0" width="4" height="30" color="#2A4B7C"></a-plane>
-      
-      <!-- Entrada principal (Punto 01) -->
-      <a-box position="-4 2 -3" width="3" height="4" depth="1" color="#0A192F"></a-box>
-      <a-box position="4 2 -3" width="3" height="4" depth="1" color="#0A192F"></a-box>
-      <a-box position="0 4.5 -3" width="11" height="1.5" depth="1" color="#0A192F">
-        <a-text value="ACCESO NAVE 8" align="center" position="0 0 0.51" scale="2 2 2" color="#FFFFFF"></a-text>
-      </a-box>
+    <!-- Botón interactivo central -->
+    <a-box id="boton-inicio" class="interactivo" position="0 1.5 -1" width="4" height="0.6" depth="0.1" color="#00FFFF">
+      <a-text value="Haz clic con el gatillo para iniciar la experiencia VR" align="center" position="0 0 0.06" color="#000000" scale="0.9 0.9 0.9"></a-text>
+    </a-box>
 
-      <!-- Pantalla táctil interactiva IoT (A la izquierda) -->
-      <a-box class="interactivo pantalla-tactil" position="-3 1.5 -2.4" width="1.8" height="1.2" depth="0.1" color="#112240">
-        <a-text value="ESTADO MAQUINA 1\nSensor BME280" align="center" position="0 0.2 0.06" color="#00E5FF"></a-text>
-        <a-text value="Tocar con gatillo\npara diagnostico" align="center" position="0 -0.2 0.06" color="#FFFFFF" scale="0.7 0.7 0.7"></a-text>
-      </a-box>
+    <!-- Panel de Sensor IoT (Lado izquierdo) -->
+    <a-box class="interactivo pantalla-tactil" position="-3 2 -2" width="2" height="1.5" depth="0.1" color="#112240">
+       <a-text value="ESTADO MAQUINA 1\nSensor BME280" align="center" position="0 0.2 0.06" color="#00FFFF"></a-text>
+    </a-box>
 
-      <!-- Palanca interactiva (A la derecha) -->
-      <a-entity position="3 1 -2.4">
-        <a-text value="Control Inyeccion" align="center" position="0 0.6 0" color="#0A192F"></a-text>
-        <a-box width="0.4" height="0.1" depth="0.4" color="#333333"></a-box>
-        <!-- Esta es la palanca que puedes agarrar con el mando -->
-        <a-cylinder class="interactivo palanca" position="0 0.25 0" radius="0.04" height="0.6" color="#FF3333"></a-cylinder>
-      </a-entity>
+    <!-- Palanca (Lado derecho) -->
+    <a-entity position="3 1 -2">
+      <a-box width="0.4" height="0.1" depth="0.4" color="#333333"></a-box>
+      <a-cylinder class="interactivo palanca" position="0 0.3 0" radius="0.04" height="0.6" color="#FF3333"></a-cylinder>
     </a-entity>
 
   </a-scene>
