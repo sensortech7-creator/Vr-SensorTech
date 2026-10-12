@@ -53,7 +53,6 @@
     </style>
   </head>
   <body>
-    <!-- Hidden Canvases for Screens -->
     <canvas id="iotCanvasEl" width="1024" height="768" style="display:none;"></canvas>
     <canvas id="dashCanvasEl" width="2048" height="1024" style="display:none;"></canvas>
 
@@ -74,7 +73,6 @@
     </div>
 
     <script>
-      // Draw screen graphics immediately
       function initCanvases() {
         const iot = document.getElementById('iotCanvasEl');
         const ctxIot = iot.getContext('2d');
@@ -91,7 +89,6 @@
         ctxIot.fillStyle = '#8BD346';
         ctxIot.fillText('ESP32 [ONLINE]', 800, 68);
 
-        // Draw metrics
         const metrics = [
           { l: 'TEMPERATURA', v: '219.5 °C', c: '#E2604F' },
           { l: 'PRESION HIDRAULICA', v: '1012.3 hPa', c: '#3AA8A0' },
@@ -129,7 +126,6 @@
         ctxDash.fillStyle = '#22C55E';
         ctxDash.fillText('[SISTEMA OPERATIVO 99.8%]', 1600, 68);
 
-        // Chart
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(30,130,960,420);
         ctxDash.strokeStyle = '#E2604F';
@@ -150,7 +146,6 @@
         }
         ctxDash.stroke();
 
-        // FFT Bars
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(30,570,960,420);
         for(let b=0; b<24; b++) {
@@ -159,7 +154,6 @@
           ctxDash.fillRect(60+b*38, 920-bh, 30, bh);
         }
 
-        // Fleet panel
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(1010,130,1000,860);
         ctxDash.fillStyle = '#EEF0F2';
@@ -168,7 +162,6 @@
       }
       window.addEventListener('DOMContentLoaded', initCanvases);
 
-      // Audio engine
       class AudioEngine {
         constructor() { this.ctx = null; this.unlocked = false; }
         getContext() {
@@ -178,7 +171,17 @@
         async unlock() {
           const ctx = this.getContext();
           if (ctx.state === 'suspended') await ctx.resume();
-          if (!this.unlocked) { this.unlocked = true; this.playChime(); }
+          if (!this.unlocked) { 
+            this.unlocked = true; 
+            this.playChime(); 
+            
+            // TRUCO PARA DESBLOQUEAR EL MOTOR DE VOZ EN META QUEST
+            if ('speechSynthesis' in window) {
+              const silentUtterance = new SpeechSynthesisUtterance('');
+              silentUtterance.volume = 0;
+              window.speechSynthesis.speak(silentUtterance);
+            }
+          }
         }
         playChime() {
           const ctx = this.getContext();
@@ -248,29 +251,24 @@
             window.speechSynthesis.cancel();
             const u = new SpeechSynthesisUtterance(text);
             
-            // Forzar el idioma español de México para mejor compatibilidad en Oculus
             u.lang = 'es-MX';
             u.volume = 1;
             u.rate = 1;
             u.pitch = 1;
             
-            // Buscar la voz en español disponible
             const voices = window.speechSynthesis.getVoices();
             const voice = voices.find(v => v.lang.startsWith('es'));
             if (voice) {
                u.voice = voice;
             }
             
-            // PARCHE META QUEST: Guardar referencia global para que no se corte el audio
             window.__currentSpeech = u; 
-            
             window.speechSynthesis.speak(u);
           }
         }
       }
       const audio = new AudioEngine();
 
-      // Precargar voces del sistema por si acaso el navegador necesita tiempo
       if ('speechSynthesis' in window) {
          window.speechSynthesis.getVoices();
       }
@@ -315,7 +313,6 @@
           el.addEventListener('triggerdown', handleAction);
           el.addEventListener('gripdown', handleAction);
 
-          // LOGICA DE JOYSTICKS CORREGIDA
           el.addEventListener('thumbstickmoved', (evt) => {
             const detail = evt.detail;
             if (!detail) return;
@@ -333,38 +330,41 @@
               }
             }
 
-            // Movimiento 360 grados con mano izquierda (Adelante, Atrás y Strafe)
+            // Movimiento 360 grados con mano izquierda (Actualizado para seguir la cámara)
             if (self.data.hand === 'left') {
               const xActive = Math.abs(detail.x) > 0.15;
               const yActive = Math.abs(detail.y) > 0.15;
               
               if (xActive || yActive) {
                 const pos = rig.getAttribute('position') || { x: 0, y: 0, z: 10 };
-                const rot = rig.getAttribute('rotation') || { x: 0, y: 0, z: 0 };
-                // Convertir la rotación de grados a radianes
-                const rad = (rot.y * Math.PI) / 180;
+                
+                // Extraer rotación del rig + rotación de la cámara (cabeza del usuario)
+                const rigRot = rig.getAttribute('rotation') || { y: 0 };
+                const cam = document.querySelector('#camera');
+                const camRot = cam ? cam.getAttribute('rotation') : { y: 0 };
+                
+                // Rotación total real hacia donde está mirando el usuario en el mundo
+                const totalRotY = rigRot.y + camRot.y;
+                const rad = (totalRotY * Math.PI) / 180;
                 
                 let dx = 0;
                 let dz = 0;
                 const speedMulti = 0.08;
 
-                // Sumar movimiento hacia adelante/atrás
                 if (yActive) {
                   dx += Math.sin(rad) * (detail.y * speedMulti);
                   dz += Math.cos(rad) * (detail.y * speedMulti);
                 }
                 
-                // Sumar movimiento lateral (Strafe - 90 grados desfasado)
                 if (xActive) {
-                  dx += Math.sin(rad + Math.PI / 2) * (detail.x * speedMulti);
-                  dz += Math.cos(rad + Math.PI / 2) * (detail.x * speedMulti);
+                  dx += Math.cos(rad) * (detail.x * speedMulti);
+                  dz -= Math.sin(rad) * (detail.x * speedMulti);
                 }
 
-                // Aplicar nueva posición con límites de mapa más amplios para que no te atores
                 rig.setAttribute('position', {
-                  x: Math.max(-10, Math.min(10, pos.x + dx)),
+                  x: Math.max(-12, Math.min(12, pos.x + dx)),
                   y: pos.y,
-                  z: Math.max(-18, Math.min(22, pos.z + dz))
+                  z: Math.max(-18, Math.min(24, pos.z + dz))
                 });
               }
             }
@@ -444,6 +444,8 @@
             if (rig) rig.setAttribute('animation', { property: 'position', to: `${self.data.targetX} 0 ${self.data.targetZ}`, dur: 800, easing: 'easeInOutQuad' });
             const guide = document.querySelector('#virtual-guide-entity');
             if (guide) guide.setAttribute('animation', { property: 'position', to: `${self.data.guideX} 1.6 ${self.data.guideZ}`, dur: 1000, easing: 'easeInOutQuad' });
+            
+            // Eliminado el setTimeout para garantizar el permiso en Meta Quest
             if (self.data.pointId === 1) audio.speak('Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech.');
             else if (self.data.pointId === 2) audio.speak('Esta es una de nuestras estaciones de inyección. Cuenta con módulos sensoriales compactos: ESP32 con sensores BME280.');
             else if (self.data.pointId === 3) audio.speak('Punto 03: Dashboard de Machine Learning. Procesando modelos predictivos para calcular la vida útil restante.');
@@ -456,9 +458,9 @@
       document.getElementById('btnStart').addEventListener('click', async () => {
         await audio.unlock();
         document.getElementById('overlay').style.display = 'none';
-        setTimeout(() => {
-          audio.speak('Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech.');
-        }, 500);
+        
+        // Eliminado el setTimeout para garantizar el permiso en Meta Quest
+        audio.speak('Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech.');
       });
     </script>
 
