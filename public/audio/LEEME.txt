@@ -1,0 +1,5 @@
+Coloca aquí la voz de la guía (mp3):
+  guia-1.mp3  -> Punto 01 (Entrada)
+  guia-2.mp3  -> Punto 02 (Sensor IoT)
+  guia-3.mp3  -> Punto 03 (Dashboard ML)
+Se generan con:  python scripts/generar-audios-guia.py
