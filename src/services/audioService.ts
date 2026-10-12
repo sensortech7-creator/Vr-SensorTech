@@ -13,7 +13,6 @@ export class SensorTechAudioService {
   private isUnlocked: boolean = false;
   private ambientGain: GainNode | null = null;
   private isMuted: boolean = false;
-  private currentUtterance: SpeechSynthesisUtterance | null = null;
   private speechVoice: SpeechSynthesisVoice | null = null;
 
   constructor() {
@@ -287,7 +286,7 @@ export class SensorTechAudioService {
       utterance.voice = this.speechVoice;
     }
 
-    // PARCHE VITAL PARA META QUEST
+    // EL PARCHE QUE PREVIENE QUE OCULUS CORTE EL AUDIO A LA MITAD
     (window as any).__currentSpeech = utterance;
     
     window.speechSynthesis.speak(utterance);
