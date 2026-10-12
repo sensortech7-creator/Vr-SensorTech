@@ -41,12 +41,10 @@ export class SensorTechAudioService {
     return this.ctx;
   }
 
-  public async unlock(): Promise<boolean> {
+  public unlock(): boolean {
     const ctx = this.getContext();
     if (ctx.state === 'suspended') {
-      try {
-        await ctx.resume();
-      } catch (e) {}
+      ctx.resume().catch(() => {});
     }
 
     if (!this.unlockedState()) {
@@ -62,7 +60,6 @@ export class SensorTechAudioService {
       this.playStartupChime();
       this.startAmbientHum();
       
-      // Desbloquear también el motor de voz
       if ('speechSynthesis' in window) {
         const silentUtterance = new SpeechSynthesisUtterance('');
         silentUtterance.volume = 0;
@@ -284,11 +281,12 @@ export class SensorTechAudioService {
     utterance.lang = 'es-MX';
     utterance.rate = 1.0;
     utterance.pitch = 1.04;
+    
     if (this.speechVoice) {
       utterance.voice = this.speechVoice;
     }
 
-    // PARCHE VITAL PARA META QUEST: Previene que el navegador borre la voz
+    // PARCHE VITAL PARA META QUEST
     (window as any).__currentSpeech = utterance;
     
     window.speechSynthesis.speak(utterance);
