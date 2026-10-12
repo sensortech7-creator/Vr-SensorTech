@@ -53,6 +53,7 @@
     </style>
   </head>
   <body>
+    <!-- Hidden Canvases for Screens -->
     <canvas id="iotCanvasEl" width="1024" height="768" style="display:none;"></canvas>
     <canvas id="dashCanvasEl" width="2048" height="1024" style="display:none;"></canvas>
 
@@ -73,6 +74,7 @@
     </div>
 
     <script>
+      // Draw screen graphics immediately
       function initCanvases() {
         const iot = document.getElementById('iotCanvasEl');
         const ctxIot = iot.getContext('2d');
@@ -89,6 +91,7 @@
         ctxIot.fillStyle = '#8BD346';
         ctxIot.fillText('ESP32 [ONLINE]', 800, 68);
 
+        // Draw metrics
         const metrics = [
           { l: 'TEMPERATURA', v: '219.5 °C', c: '#E2604F' },
           { l: 'PRESION HIDRAULICA', v: '1012.3 hPa', c: '#3AA8A0' },
@@ -126,6 +129,7 @@
         ctxDash.fillStyle = '#22C55E';
         ctxDash.fillText('[SISTEMA OPERATIVO 99.8%]', 1600, 68);
 
+        // Chart
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(30,130,960,420);
         ctxDash.strokeStyle = '#E2604F';
@@ -146,6 +150,7 @@
         }
         ctxDash.stroke();
 
+        // FFT Bars
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(30,570,960,420);
         for(let b=0; b<24; b++) {
@@ -154,6 +159,7 @@
           ctxDash.fillRect(60+b*38, 920-bh, 30, bh);
         }
 
+        // Fleet panel
         ctxDash.fillStyle = '#14171C';
         ctxDash.fillRect(1010,130,1000,860);
         ctxDash.fillStyle = '#EEF0F2';
@@ -162,6 +168,7 @@
       }
       window.addEventListener('DOMContentLoaded', initCanvases);
 
+      // Audio engine
       class AudioEngine {
         constructor() { this.ctx = null; this.unlocked = false; }
         getContext() {
@@ -252,10 +259,10 @@
         init: function() {
           const canvas = document.getElementById(this.data.canvasId);
           if (!canvas) return;
-          this.texture = new THREE.CanvasTexture(canvas);
+          this.texture = new AFRAME.THREE.CanvasTexture(canvas);
           const mesh = this.el.getObject3D('mesh');
           if (mesh) {
-            mesh.material = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide });
+            mesh.material = new AFRAME.THREE.MeshBasicMaterial({ map: this.texture, side: AFRAME.THREE.DoubleSide });
           }
         },
         tick: function() {
@@ -376,7 +383,7 @@
       });
     </script>
 
-    <a-scene embedded renderer="antialias: true; colorManagement: true;" vr-mode-ui="enabled: true">
+    <a-scene renderer="antialias: true; colorManagement: true;" vr-mode-ui="enabled: true">
       <a-assets>
         <img id="sensortech-logo" src="logo-sensortech.svg" alt="SensorTech" />
       </a-assets>
