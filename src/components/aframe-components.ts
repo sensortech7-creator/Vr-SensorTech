@@ -11,7 +11,7 @@ export function registerAFrameComponents() {
   const AFRAME = window.AFRAME;
   if (AFRAME.components['dynamic-screen']) return;
 
-  // 1. DYNAMIC SCREEN COMPONENT
+  // DYNAMIC SCREEN
   AFRAME.registerComponent('dynamic-screen', {
     schema: { canvasId: { type: 'string', default: 'iotCanvasEl' } },
     init: function () {
@@ -20,10 +20,7 @@ export function registerAFrameComponents() {
       const bindTexture = () => {
         const canvas = document.getElementById(self.data.canvasId) as HTMLCanvasElement;
         const mesh = el.getObject3D('mesh');
-        if (!canvas || !mesh) {
-          setTimeout(bindTexture, 80);
-          return;
-        }
+        if (!canvas || !mesh) { setTimeout(bindTexture, 80); return; }
         const texture = new THREE.CanvasTexture(canvas);
         texture.minFilter = THREE.LinearFilter;
         texture.magFilter = THREE.LinearFilter;
@@ -35,12 +32,10 @@ export function registerAFrameComponents() {
       if (el.hasLoaded) bindTexture();
       else el.addEventListener('loaded', bindTexture);
     },
-    tick: function () {
-      if (this.texture) this.texture.needsUpdate = true;
-    }
+    tick: function () { if (this.texture) this.texture.needsUpdate = true; }
   });
 
-  // 2. META QUEST 3 CONTROLLER COMPONENT (JOYSTICKS REPARADOS)
+  // JOYSTICKS Y MANDOS META QUEST 3
   AFRAME.registerComponent('quest-controller-interaction', {
     schema: { hand: { type: 'string', default: 'right' } },
     init: function () {
@@ -58,13 +53,10 @@ export function registerAFrameComponents() {
 
           const lever = target.closest('[interactive-lever]');
           if (lever) { lever.emit('pull', { hand: self.data.hand }); return; }
-
           const craneLever = target.closest('[crane-control-lever]');
           if (craneLever) { craneLever.emit('pull', { hand: self.data.hand }); return; }
-
           const screenBtn = target.closest('[touch-screen-button]');
           if (screenBtn) { screenBtn.emit('press', { hand: self.data.hand }); return; }
-
           const waypoint = target.closest('[floor-waypoint]');
           if (waypoint) { waypoint.emit('select-waypoint'); return; }
         }
@@ -73,14 +65,14 @@ export function registerAFrameComponents() {
       el.addEventListener('triggerdown', handleAction);
       el.addEventListener('gripdown', handleAction);
 
-      // LÓGICA DE JOYSTICKS
+      // MOVIMIENTO CON LOS JOYSTICKS
       el.addEventListener('thumbstickmoved', (evt: any) => {
         const detail = evt.detail;
         if (!detail) return;
         const rig = document.querySelector('#rig') as any;
         if (!rig) return;
 
-        // Mano Derecha: Giro rápido de cámara (Intacto)
+        // Joystick Derecho: Girar vista (Intacto)
         if (self.data.hand === 'right' && Math.abs(detail.x) > 0.75) {
           if (!self.stickCooldown) {
             self.stickCooldown = true;
@@ -91,7 +83,7 @@ export function registerAFrameComponents() {
           }
         }
 
-        // Mano Izquierda: Movimiento 360 grados (Adelante, atrás y lados)
+        // Joystick Izquierdo: Caminar en 360 grados apuntando con la cabeza
         if (self.data.hand === 'left') {
           const xActive = Math.abs(detail.x) > 0.15;
           const yActive = Math.abs(detail.y) > 0.15;
@@ -99,12 +91,11 @@ export function registerAFrameComponents() {
           if (xActive || yActive) {
             const pos = rig.getAttribute('position') || { x: 0, y: 0, z: 10 };
             
-            // Obtener rotación del jugador y de la cámara (cabeza)
             const rigRot = rig.getAttribute('rotation') || { y: 0 };
             const cam = document.querySelector('#camera') as any;
             const camRot = cam ? cam.getAttribute('rotation') : { y: 0 };
             
-            // Hacia dónde mira el jugador realmente
+            // Ángulo real hacia donde miras
             const totalRotY = rigRot.y + camRot.y;
             const rad = (totalRotY * Math.PI) / 180;
             
@@ -112,13 +103,10 @@ export function registerAFrameComponents() {
             let dz = 0;
             const speedMulti = 0.08;
 
-            // Adelante / Atrás
             if (yActive) {
               dx += Math.sin(rad) * (detail.y * speedMulti);
               dz += Math.cos(rad) * (detail.y * speedMulti);
             }
-            
-            // Lados (Strafe)
             if (xActive) {
               dx += Math.cos(rad) * (detail.x * speedMulti);
               dz -= Math.sin(rad) * (detail.x * speedMulti);
@@ -144,7 +132,7 @@ export function registerAFrameComponents() {
     }
   });
 
-  // 3. MACHINE INJECTION & PURGE LEVER COMPONENT
+  // RESTO DE LOS COMPONENTES ORIGINALES
   AFRAME.registerComponent('interactive-lever', {
     schema: { machineId: { type: 'string', default: 'INX-02' } },
     init: function () {
@@ -155,17 +143,13 @@ export function registerAFrameComponents() {
         self.isPulled = !self.isPulled;
         audioService.playLeverPurge();
         const handle = el.querySelector('.lever-handle');
-        if (handle) {
-          handle.setAttribute('animation', { property: 'rotation', to: self.isPulled ? '42 0 0' : '0 0 0', dur: 280, easing: 'easeOutBack' });
-        }
+        if (handle) handle.setAttribute('animation', { property: 'rotation', to: self.isPulled ? '42 0 0' : '0 0 0', dur: 280, easing: 'easeOutBack' });
         const machine = el.closest('.machine-unit');
         if (machine) {
           const piston = machine.querySelector('.injection-piston');
           if (piston) {
             piston.setAttribute('animation__forward', { property: 'position', to: '0.4 1.5 0', dur: 350, easing: 'easeOutQuad' });
-            setTimeout(() => {
-              piston.setAttribute('animation__back', { property: 'position', to: '0 1.5 0', dur: 450, easing: 'easeInOutQuad' });
-            }, 500);
+            setTimeout(() => { piston.setAttribute('animation__back', { property: 'position', to: '0 1.5 0', dur: 450, easing: 'easeInOutQuad' }); }, 500);
           }
           const steam = machine.querySelector('.steam-purge-cloud');
           if (steam) {
@@ -190,12 +174,9 @@ export function registerAFrameComponents() {
       };
       el.addEventListener('click', triggerAction);
       el.addEventListener('pull', triggerAction);
-      const hitbox = el.querySelector('.lever-hitbox');
-      if (hitbox) hitbox.addEventListener('click', triggerAction);
     }
   });
 
-  // 4. OVERHEAD CRANE CONTROLLER LEVER
   AFRAME.registerComponent('crane-control-lever', {
     init: function () {
       const el = this.el;
@@ -204,28 +185,17 @@ export function registerAFrameComponents() {
         this.isMoved = !this.isMoved;
         audioService.playCraneMove();
         const handle = el.querySelector('.crane-lever-handle');
-        if (handle) {
-          handle.setAttribute('animation', { property: 'rotation', to: this.isMoved ? '40 0 0' : '-35 0 0', dur: 300, easing: 'easeOutQuad' });
-        }
+        if (handle) handle.setAttribute('animation', { property: 'rotation', to: this.isMoved ? '40 0 0' : '-35 0 0', dur: 300, easing: 'easeOutQuad' });
         const crane = document.querySelector('#overhead-crane') as any;
-        if (crane) {
-          const targetZ = this.isMoved ? -6 : 3.5;
-          crane.setAttribute('animation__move', { property: 'position', to: `0 7.8 ${targetZ}`, dur: 3200, easing: 'easeInOutQuad' });
-        }
+        if (crane) crane.setAttribute('animation__move', { property: 'position', to: `0 7.8 ${this.isMoved ? -6 : 3.5}`, dur: 3200, easing: 'easeInOutQuad' });
         const trolley = document.querySelector('#crane-trolley') as any;
-        if (trolley) {
-          const targetX = this.isMoved ? 2.8 : -2.8;
-          trolley.setAttribute('animation__trolley', { property: 'position', to: `${targetX} -0.5 0`, dur: 3000, easing: 'easeInOutQuad' });
-        }
+        if (trolley) trolley.setAttribute('animation__trolley', { property: 'position', to: `${this.isMoved ? 2.8 : -2.8} -0.5 0`, dur: 3000, easing: 'easeInOutQuad' });
       };
       el.addEventListener('click', operateCrane);
       el.addEventListener('pull', operateCrane);
-      const hitbox = el.querySelector('.crane-hitbox');
-      if (hitbox) hitbox.addEventListener('click', operateCrane);
     }
   });
 
-  // 5. TOUCH SCREEN BUTTON COMPONENT
   AFRAME.registerComponent('touch-screen-button', {
     schema: { action: { type: 'string', default: 'test' }, label: { type: 'string', default: 'BOTON' } },
     init: function () {
@@ -241,12 +211,9 @@ export function registerAFrameComponents() {
       el.addEventListener('click', handlePress);
       el.addEventListener('press', handlePress);
       el.addEventListener('triggerdown', handlePress);
-      const textChild = el.querySelector('a-text');
-      if (textChild) { textChild.addEventListener('click', handlePress); textChild.classList.add('clickable'); }
     }
   });
 
-  // 6. VIRTUAL GUIDE COMPONENT
   AFRAME.registerComponent('virtual-guide', {
     init: function () {
       this.ring1 = this.el.querySelector('.guide-ring-1');
@@ -260,19 +227,12 @@ export function registerAFrameComponents() {
       if (this.ring1) { this.ring1.object3D.rotation.y += 0.025; this.ring1.object3D.rotation.z += 0.012; }
       if (this.ring2) { this.ring2.object3D.rotation.x += 0.035; this.ring2.object3D.rotation.y -= 0.018; }
       if (this.ring3) { this.ring3.object3D.rotation.z -= 0.028; }
-      if (this.core) { this.core.object3D.position.y = Math.sin(this.time * 2.2) * 0.08; }
+      if (this.core) this.core.object3D.position.y = Math.sin(this.time * 2.2) * 0.08;
     }
   });
 
-  // 7. FLOOR WAYPOINT COMPONENT
   AFRAME.registerComponent('floor-waypoint', {
-    schema: {
-      pointId: { type: 'number', default: 1 },
-      targetX: { type: 'number', default: 0 },
-      targetZ: { type: 'number', default: 10 },
-      guideX: { type: 'number', default: 2.2 },
-      guideZ: { type: 'number', default: 7.2 }
-    },
+    schema: { pointId: { type: 'number', default: 1 }, targetX: { type: 'number', default: 0 }, targetZ: { type: 'number', default: 10 }, guideX: { type: 'number', default: 2.2 }, guideZ: { type: 'number', default: 7.2 } },
     init: function () {
       const el = this.el;
       const self = this;
@@ -280,15 +240,10 @@ export function registerAFrameComponents() {
         audioService.unlock();
         audioService.playBeep(false);
         const rig = document.querySelector('#rig') as any;
-        if (rig) {
-          rig.setAttribute('animation', { property: 'position', to: `${self.data.targetX} 0 ${self.data.targetZ}`, dur: 800, easing: 'easeInOutCubic' });
-        }
+        if (rig) rig.setAttribute('animation', { property: 'position', to: `${self.data.targetX} 0 ${self.data.targetZ}`, dur: 800, easing: 'easeInOutCubic' });
         const guide = document.querySelector('#virtual-guide-entity') as any;
-        if (guide) {
-          guide.setAttribute('animation', { property: 'position', to: `${self.data.guideX} 1.6 ${self.data.guideZ}`, dur: 1100, easing: 'easeInOutQuad' });
-        }
-        setTimeout(() => { audioService.speakWaypoint(self.data.pointId); }, 500);
-        window.dispatchEvent(new CustomEvent('sensortech:waypoint-selected', { detail: { pointId: self.data.pointId } }));
+        if (guide) guide.setAttribute('animation', { property: 'position', to: `${self.data.guideX} 1.6 ${self.data.guideZ}`, dur: 1100, easing: 'easeInOutQuad' });
+        audioService.speakWaypoint(self.data.pointId);
       };
       el.addEventListener('click', triggerTeleport);
       el.addEventListener('select-waypoint', triggerTeleport);
