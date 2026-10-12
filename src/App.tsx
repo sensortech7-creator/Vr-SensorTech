@@ -78,11 +78,10 @@ export default function App() {
   }, []);
 
   const handleStartExperience = () => {
-    // SIN RETRASOS NI AWAIT PARA QUE META QUEST NO BLOQUEE LA VOZ
     audioService.unlock();
     setIsAudioUnlocked(true);
     setShowHelpModal(false);
-    audioService.speakWaypoint(1);
+    audioService.speakWaypoint(1); // Cero retrasos para que Oculus no lo bloquee
   };
 
   const handleToggleMute = () => setIsMuted(audioService.toggleMute());
@@ -153,18 +152,15 @@ export default function App() {
     const guide = document.querySelector('#virtual-guide-entity') as any;
     if (guide) guide.setAttribute('animation', { property: 'position', to: `${guideX} 1.6 ${guideZ}`, dur: 1100, easing: 'easeInOutQuad' });
 
-    // SIN RETRASOS PARA LA VOZ
-    audioService.speakWaypoint(pointId);
+    audioService.speakWaypoint(pointId); // SIN RETRASOS PARA LA VOZ
   };
 
   return (
-    // CONTENEDOR PRINCIPAL CON ID PARA DOM OVERLAY
+    // EL ID ES IMPORTANTE PARA QUE LA INTERFAZ NO DESAPAREZCA EN VR
     <div id="dom-overlay-container" className="relative w-full h-screen bg-[#0C0E11] text-[#EEF0F2] overflow-hidden select-none">
       
       {/* 2D HUD OVERLAY */}
       <div className="fixed inset-0 pointer-events-none z-[99999999] flex flex-col justify-between p-3 sm:p-5">
-        
-        {/* Top Header & Action Bar */}
         <div className="flex items-center justify-between gap-2 sm:gap-3 pointer-events-auto flex-wrap">
           <div className="flex items-center gap-2.5 sm:gap-3 bg-[#14171C]/95 backdrop-blur-md px-3.5 py-2 rounded-xl border border-white/10 shadow-xl">
             <img src="/logo-sensortech.svg" alt="SensorTech Logo" className="w-8 h-8 sm:w-9 sm:h-9 object-contain" />
@@ -191,7 +187,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* Bottom Navigation & Live Telemetry Dock */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-3 pointer-events-auto">
           <div className="flex items-center gap-1.5 sm:gap-2 bg-[#14171C]/95 backdrop-blur-md p-1.5 rounded-xl border border-white/10 shadow-xl overflow-x-auto max-w-full">
             <span className="px-2.5 text-xs font-semibold text-[#8B93A1] hidden sm:inline whitespace-nowrap">Estaciones:</span>
@@ -210,7 +205,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* WELCOME & AUDIO UNLOCK MODAL */}
+      {/* WELCOME MODAL */}
       {showHelpModal && (
         <div className="fixed inset-0 z-[999999999] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md pointer-events-auto">
           <div className="bg-[#14171C] border border-white/15 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-[#EEF0F2]">
@@ -222,16 +217,7 @@ export default function App() {
               </div>
             </div>
             <p className="text-sm text-[#8B93A1] mb-4 leading-relaxed">Pantallas de telemetría y Machine Learning activas con respuesta inmediata a los botones, palanca para conducir el puente grúa de 10T y palanca de purga con vapor para mandos de Meta Quest 3.</p>
-            <div className="bg-[#1B1F26] rounded-xl p-3.5 mb-5 border border-white/10">
-              <div className="text-xs font-semibold text-[#EEF0F2] mb-2 flex items-center gap-1.5"><Sparkles className="w-3.5 h-3.5 text-[#00E5FF]" />Interacciones en Pantallas y Mandos:</div>
-              <ul className="text-xs text-[#8B93A1] space-y-1.5">
-                <li className="flex items-start gap-2"><span className="font-mono text-[#00E5FF] font-bold">&bull; Diagnóstico AI:</span><span>Presiona [DIAGNÓSTICO AI] en la gran pantalla para iniciar el escaneo predictivo LSTM.</span></li>
-                <li className="flex items-start gap-2"><span className="font-mono text-[#E2493D] font-bold">&bull; Simular Anomalía:</span><span>Presiona [SIMULAR ANOMALÍA] para provocar alertas críticas en rojo y picos de vibración.</span></li>
-                <li className="flex items-start gap-2"><span className="font-mono text-[#22C55E] font-bold">&bull; Restablecer / Calibrar:</span><span>Presiona [RESTABLECER] o [CALIBRAR] para normalizar todos los sensores.</span></li>
-                <li className="flex items-start gap-2"><span className="font-mono text-[#FFC107] font-bold">&bull; Palanca de Grúa:</span><span>Jala la palanca en el pedestal central para mover el Puente Grúa sobre tu cabeza.</span></li>
-              </ul>
-            </div>
-            <div className="flex items-center justify-end gap-3">
+            <div className="flex items-center justify-end gap-3 mt-5">
               <button onClick={handleStartExperience} className="w-full py-3 px-5 rounded-xl bg-gradient-to-r from-[#0058C6] to-[#0A3B7A] hover:brightness-110 border border-white/20 text-sm font-bold text-white flex items-center justify-center gap-2 shadow-lg transition active:scale-[0.98] cursor-pointer">
                 <Play className="w-4 h-4 fill-current text-white" />EMPEZAR RECORRIDO Y ACTIVAR AUDIO
               </button>
@@ -240,7 +226,7 @@ export default function App() {
         </div>
       )}
 
-      {/* A-FRAME 3D SCENE CON DOM-OVERLAY ACTIVADO PARA MANTENER LA UI EN VR */}
+      {/* WEBXR DOM OVERLAY INCORPORADO PARA QUE LOS MENUS 2D NO SE BORREN */}
       <a-scene
         webxr="optionalFeatures: dom-overlay; overlayElement: #dom-overlay-container"
         embedded
@@ -262,33 +248,10 @@ export default function App() {
 
         <a-entity id="rig" position="0 0 11">
           <a-camera id="camera" position="0 1.6 0" look-controls="pointerLockEnabled: false" wasd-controls="acceleration: 25">
-            <a-cursor
-              id="desktop-cursor"
-              color="#00E5FF"
-              opacity="0.85"
-              raycaster="objects: .clickable"
-              cursor="fuse: false"
-              material="shader: flat"
-              position="0 0 -1"
-              geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.018"
-            ></a-cursor>
+            <a-cursor id="desktop-cursor" color="#00E5FF" opacity="0.85" raycaster="objects: .clickable" cursor="fuse: false" material="shader: flat" position="0 0 -1" geometry="primitive: ring; radiusInner: 0.01; radiusOuter: 0.018"></a-cursor>
           </a-camera>
-
-          <a-entity
-            id="leftHand"
-            oculus-touch-controls="hand: left; model: true"
-            laser-controls="hand: left"
-            raycaster="objects: .clickable; showLine: true; far: 14; lineColor: #00E5FF; lineOpacity: 0.9"
-            quest-controller-interaction="hand: left"
-          ></a-entity>
-
-          <a-entity
-            id="rightHand"
-            oculus-touch-controls="hand: right; model: true"
-            laser-controls="hand: right"
-            raycaster="objects: .clickable; showLine: true; far: 14; lineColor: #00E5FF; lineOpacity: 0.9"
-            quest-controller-interaction="hand: right"
-          ></a-entity>
+          <a-entity id="leftHand" oculus-touch-controls="hand: left; model: true" laser-controls="hand: left" raycaster="objects: .clickable; showLine: true; far: 14; lineColor: #00E5FF; lineOpacity: 0.9" quest-controller-interaction="hand: left"></a-entity>
+          <a-entity id="rightHand" oculus-touch-controls="hand: right; model: true" laser-controls="hand: right" raycaster="objects: .clickable; showLine: true; far: 14; lineColor: #00E5FF; lineOpacity: 0.9" quest-controller-interaction="hand: right"></a-entity>
         </a-entity>
 
         <a-entity id="virtual-guide-entity" position="2.2 1.6 7.2" virtual-guide>
@@ -310,6 +273,22 @@ export default function App() {
           <a-torus class="guide-ring-2" radius="0.68" radius-tubular="0.016" color="#00B0FF" material="emissive: #00B0FF; emissiveIntensity: 0.8; metalness: 0.9" rotation="60 30 0"></a-torus>
           <a-torus class="guide-ring-3" radius="0.78" radius-tubular="0.014" color="#00E5FF" material="emissive: #00E5FF; emissiveIntensity: 0.75; metalness: 0.9" rotation="120 70 0"></a-torus>
         </a-entity>
+
+        {/* --- RECREACIÓN DE LA CONSOLA MAESTRA CENTRAL --- */}
+        <a-entity position="0 1.0 -2" rotation="-15 0 0">
+          <a-box width="2.6" height="0.8" depth="0.2" color="#112240"></a-box>
+          <a-text value="CONSOLA MAESTRA SENSORTECH 4.0" align="center" position="0 0.25 0.11" color="#FFC107" width="3.5" font="monoid"></a-text>
+          <a-box position="-0.8 -0.15 0.1" width="0.6" height="0.2" depth="0.05" color="#262B33" class="clickable touch-screen-btn" touch-screen-button="action: diagnostic; label: DIAGNOSTICO AI">
+            <a-text value="DIAGNOSTICO AI" align="center" position="0 0 0.03" color="#00E5FF" width="2" font="monoid" class="clickable"></a-text>
+          </a-box>
+          <a-box position="0 -0.15 0.1" width="0.6" height="0.2" depth="0.05" color="#262B33" class="clickable touch-screen-btn" touch-screen-button="action: test-alert; label: SIMULAR ALERTA">
+            <a-text value={sensorData.anomalySimulated ? 'RESTABLECER' : 'SIMULAR ALERTA'} align="center" position="0 0 0.03" color={sensorData.anomalySimulated ? '#22C55E' : '#E2493D'} width="2" font="monoid" class="clickable"></a-text>
+          </a-box>
+          <a-box position="0.8 -0.15 0.1" width="0.6" height="0.2" depth="0.05" color="#262B33" class="clickable touch-screen-btn" touch-screen-button="action: calibrate; label: RESTABLECER">
+            <a-text value="RESTABLECER" align="center" position="0 0 0.03" color="#EEF0F2" width="2" font="monoid" class="clickable"></a-text>
+          </a-box>
+        </a-entity>
+        {/* ----------------------------------------------- */}
 
         <a-plane position="0 0 0" rotation="-90 0 0" width="26" height="38" color="#4A5568" material="roughness: 0.4; metalness: 0.15"></a-plane>
         <a-plane position="0 0.01 0" rotation="-90 0 0" width="4.8" height="38" color="#0058C6" material="roughness: 0.25; metalness: 0.2"></a-plane>
@@ -479,86 +458,4 @@ export default function App() {
               <React.Fragment key={`rack2-led-${lidx}`}>
                 <a-sphere position={`0.35 ${ly} 0.53`} radius="0.025" color="#8BD346" material="emissive: #8BD346; emissiveIntensity: 1"></a-sphere>
                 <a-sphere position={`0.25 ${ly} 0.53`} radius="0.025" color="#F0A93A" material="emissive: #F0A93A; emissiveIntensity: 1"></a-sphere>
-                <a-sphere position={`0.15 ${ly} 0.53`} radius="0.025" color="#3AA8A0" material="emissive: #3AA8A0; emissiveIntensity: 1"></a-sphere>
-                <a-box position={`-0.2 ${ly} 0.53`} width="0.45" height="0.1" depth="0.02" color="#21262E"></a-box>
-              </React.Fragment>
-            ))}
-          </a-entity>
-        </a-entity>
-
-        <a-entity position="-12.7 5.5 0" rotation="0 90 0">
-          <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
-          <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#3AA8A0"></a-box>
-          <a-image src="#sensortech-logo" position="-2.3 0 0.05" width="2" height="2"></a-image>
-          <a-text value="SENSORTECH 4.0" position="-0.8 0.6 0.05" color="#EEF0F2" width="7" font="monoid"></a-text>
-          <a-text value="MANTENIMIENTO PREDICTIVO // IA" position="-0.8 0.1 0.05" color="#3AA8A0" width="5.5" font="monoid"></a-text>
-          <a-text value="Telemetria ESP32 + Redes Neuronales LSTM" position="-0.8 -0.4 0.05" color="#8B93A1" width="4.5" font="monoid"></a-text>
-        </a-entity>
-        <a-entity position="12.7 5.5 0" rotation="0 -90 0">
-          <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
-          <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#E2604F"></a-box>
-          <a-image src="#sensortech-logo" position="2.3 0 0.05" width="2" height="2"></a-image>
-          <a-text value="ZERO DOWNTIME" position="-2.8 0.6 0.05" color="#EEF0F2" width="7" font="monoid"></a-text>
-          <a-text value="EFICIENCIA OEE SUPERIOR AL 92%" position="-2.8 0.1 0.05" color="#E2604F" width="5.5" font="monoid"></a-text>
-          <a-text value="Deteccion de fatiga en rodamientos y desalineacion" position="-2.8 -0.4 0.05" color="#8B93A1" width="4.5" font="monoid"></a-text>
-        </a-entity>
-
-        {[
-          { id: 'INX-01', x: -6.5, z: 9, rot: 90, name: 'INX-01 ENGEL 200T' },
-          { id: 'INX-02', x: -6.5, z: 3, rot: 90, name: 'INX-02 ARBURG 370' },
-          { id: 'INX-03', x: -6.5, z: -3, rot: 90, name: 'INX-03 KRAUSS 150T' },
-          { id: 'INX-04', x: 6.5, z: 9, rot: -90, name: 'INX-04 HAITIAN 160T' },
-          { id: 'INX-05', x: 6.5, z: 3, rot: -90, name: 'INX-05 ENGEL 180T' },
-          { id: 'INX-06', x: 6.5, z: -3, rot: -90, name: 'INX-06 ARBURG 320' },
-        ].map(m => (
-          <a-entity key={m.id} id={`machine-${m.id}`} class="machine-unit" position={`${m.x} 0 ${m.z}`} rotation={`0 ${m.rot} 0`}>
-            <a-box position="0 0.5 0" width="5.2" height="1.0" depth="1.8" color="#0B2046"></a-box>
-            <a-box position="0 0.88 0" width="5.0" height="0.12" depth="1.7" color="#EAEDF1"></a-box>
-            <a-box position="-1.5 1.5 0" width="0.4" height="1.2" depth="1.5" color="#0B2046"></a-box>
-            <a-box position="-0.4 1.5 0" width="0.4" height="1.1" depth="1.4" color="#CBD5E1"></a-box>
-            <a-cylinder position="-1.0 1.9 0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
-            <a-cylinder position="-1.0 1.9 -0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
-            <a-cylinder position="-1.0 1.1 0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
-            <a-cylinder position="-1.0 1.1 -0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
-            <a-box position="-1.9 1.5 0" width="0.5" height="0.6" depth="0.6" color="#C62828"></a-box>
-            <a-entity class="injection-piston" position="0 1.5 0">
-              <a-cylinder position="1.1 0 0" rotation="0 0 90" radius="0.22" height="2.2" color="#EAEDF1"></a-cylinder>
-              {[0.4, 0.8, 1.2, 1.6].map((hx, hidx) => (
-                <a-torus key={`band-${hidx}`} position={`${hx} 0 0`} rotation="0 90 0" radius="0.24" radius-tubular="0.035" color="#E2604F" material="emissive: #E2604F; emissiveIntensity: 0.5"></a-torus>
-              ))}
-            </a-entity>
-            <a-sphere class="steam-purge-cloud" position="0 1.5 0" radius="0.6" color="#FFFFFF" material="transparent: true; opacity: 0; roughness: 0.9" visible="false"></a-sphere>
-            <a-cone position="1.5 2.5 0" radius-bottom="0.22" radius-top="0.55" height="0.9" color="#B0BEC5" material="metalness: 0.8; roughness: 0.25"></a-cone>
-            <a-cylinder position="1.5 1.9 0" radius="0.12" height="0.4" color="#0B2046"></a-cylinder>
-            <a-box position="0.2 1.6 0.95" rotation="-15 0 0" width="0.75" height="0.5" depth="0.1" color="#0B2046"></a-box>
-            <a-plane position="0.2 1.61 1.01" rotation="-15 0 0" width="0.65" height="0.4" color="#0C0E11"></a-plane>
-            <a-text value={m.id} align="center" position="0.2 1.65 1.03" rotation="-15 0 0" color="#00E5FF" width="1.8" font="monoid"></a-text>
-
-            <a-entity id={`lever-${m.id}`} class="clickable interactive-lever" position="0.9 1.25 0.96" interactive-lever={`machineId: ${m.id}`}>
-              <a-box class="clickable lever-hitbox" position="0 0.25 0" width="0.7" height="1.0" depth="0.7" material="opacity: 0; transparent: true"></a-box>
-              <a-box position="0 0 -0.04" width="0.18" height="0.24" depth="0.06" color="#1E293B"></a-box>
-              <a-text value="PURGA/MANUAL" align="center" position="0 0.16 0" color="#FFC107" width="1.1" font="monoid"></a-text>
-              <a-entity class="lever-handle" position="0 0 0" rotation="0 0 0">
-                <a-cylinder class="clickable" position="0 0.16 0.05" radius="0.018" height="0.32" color="#E2E8F0" material="metalness: 0.9"></a-cylinder>
-                <a-sphere class="clickable" position="0 0.32 0.05" radius="0.045" color="#E2493D" material="roughness: 0.3"></a-sphere>
-              </a-entity>
-            </a-entity>
-
-            <a-entity position="-2.2 2.1 0.7">
-              <a-cylinder position="0 0 0" radius="0.02" height="0.8" color="#94A3B8"></a-cylinder>
-              <a-cylinder class="status-beacon-green" position="0 0.45 0" radius="0.06" height="0.1" color="#22C55E" material="emissive: #22C55E; emissiveIntensity: 1.0"></a-cylinder>
-              <a-cylinder class="status-beacon-amber" position="0 0.58 0" radius="0.06" height="0.1" color="#14171C" material="emissive: #000; emissiveIntensity: 0"></a-cylinder>
-              <a-cylinder position="0 0.71 0" radius="0.06" height="0.1" color="#14171C" material="emissive: #000; emissiveIntensity: 0"></a-cylinder>
-            </a-entity>
-            <a-box position="0 0.6 1.4" width="4.8" height="0.05" depth="0.05" color="#FFC107"></a-box>
-            <a-box position="0 1.0 1.4" width="4.8" height="0.05" depth="0.05" color="#FFC107"></a-box>
-            <a-cylinder position="-2.3 0.5 1.4" radius="0.03" height="1.0" color="#FFC107"></a-cylinder>
-            <a-cylinder position="2.3 0.5 1.4" radius="0.03" height="1.0" color="#FFC107"></a-cylinder>
-          </a-entity>
-        ))}
-
-        <a-entity id="audio-listener" sound="src: url(data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=); autoplay: false; loop: true"></a-entity>
-      </a-scene>
-    </div>
-  );
-}
+                <a-sphere position={`0.15 ${ly} 0.53`} radius="0.025" color="#3AA8A0" material="emissive: #3AA8A0; emissiveIntensity: 1"></a-
