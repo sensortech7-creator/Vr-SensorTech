@@ -4,23 +4,521 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>SensorTech VR - Planta de Inyección 4.0</title>
-    <meta name="description" content="Entorno virtual 3D interactivo WebXR de la Planta de Inyección SensorTech con mandos Meta Quest 3, monitoreo IoT predictivo y guía virtual." />
-    <meta property="og:title" content="SensorTech VR - Planta de Inyección 4.0" />
-    <meta property="og:description" content="Entorno virtual 3D interactivo WebXR de la Planta de Inyección SensorTech con mandos Meta Quest 3, monitoreo IoT predictivo y guía virtual." />
-    <meta property="og:type" content="website" />
-    <meta name="twitter:card" content="summary_large_image" />
-    <link rel="icon" type="image/svg+xml" href="/logo-sensortech.svg" />
-
-    <!-- Google Fonts for Industrial Instrumentation UI -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- A-Frame WebXR Engine -->
     <script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0C0E11;
+        color: #EEF0F2;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+        user-select: none;
+      }
+      #overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(12, 14, 17, 0.88);
+        backdrop-filter: blur(8px);
+      }
+      .modal-box {
+        background: #14171C;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 16px;
+        max-width: 500px;
+        width: 90%;
+        padding: 24px;
+        box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+      }
+      .btn-start {
+        width: 100%;
+        padding: 14px 20px;
+        background: linear-gradient(135deg, #0058C6 0%, #0A3B7A 100%);
+        color: #FFFFFF;
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 15px;
+        cursor: pointer;
+        transition: 0.2s ease;
+      }
+      .btn-start:hover {
+        filter: brightness(1.15);
+      }
+    </style>
   </head>
-  <body class="bg-[#0C0E11] text-[#EEF0F2] overflow-hidden select-none m-0 p-0 font-['Plus_Jakarta_Sans',sans-serif]">
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+  <body>
+    <!-- Hidden Canvases for Screens -->
+    <canvas id="iotCanvasEl" width="1024" height="768" style="display:none;"></canvas>
+    <canvas id="dashCanvasEl" width="2048" height="1024" style="display:none;"></canvas>
+
+    <div id="overlay">
+      <div class="modal-box">
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+          <img src="public/logo-sensortech.svg" width="60" height="60" alt="Logo SensorTech" />
+          <div>
+            <h2 style="margin:0; font-size:18px; color:#EEF0F2;">PLANTA DE INYECCIÓN SENSORTECH</h2>
+            <span style="font-size:12px; color:#00E5FF; font-weight:600;">INDUSTRIA 4.0 // WEBXR META QUEST 3</span>
+          </div>
+        </div>
+        <p style="font-size:13px; color:#8B93A1; line-height:1.5; margin-bottom:20px;">
+          Puertas de entrada abiertas con vista al exterior, pantallas de telemetría y Machine Learning activas, y palancas mecánicas e interactivas para mandos de Meta Quest 3.
+        </p>
+        <button id="btnStart" class="btn-start">EMPEZAR RECORRIDO Y ACTIVAR AUDIO</button>
+      </div>
+    </div>
+
+    <script>
+      // Draw screen graphics immediately
+      function initCanvases() {
+        const iot = document.getElementById('iotCanvasEl');
+        const ctxIot = iot.getContext('2d');
+        ctxIot.fillStyle = '#14171C';
+        ctxIot.fillRect(0,0,1024,768);
+        ctxIot.strokeStyle = '#3AA8A0';
+        ctxIot.lineWidth = 8;
+        ctxIot.strokeRect(4,4,1016,760);
+        ctxIot.fillStyle = '#1B1F26';
+        ctxIot.fillRect(12,12,1000,90);
+        ctxIot.fillStyle = '#EEF0F2';
+        ctxIot.font = 'bold 32px monospace';
+        ctxIot.fillText('NODO IOT SENSORTECH - ESTACION INX-02', 36, 68);
+        ctxIot.fillStyle = '#8BD346';
+        ctxIot.fillText('ESP32 [ONLINE]', 800, 68);
+
+        // Draw metrics
+        const metrics = [
+          { l: 'TEMPERATURA', v: '219.5 °C', c: '#E2604F' },
+          { l: 'PRESION HIDRAULICA', v: '1012.3 hPa', c: '#3AA8A0' },
+          { l: 'HUMEDAD AMBIENTE', v: '41.5 %', c: '#6B7FD6' },
+          { l: 'VIBRACION', v: '3.72 mm/s', c: '#22C55E' },
+          { l: 'CORRIENTE', v: '43.4 A', c: '#EEF0F2' },
+          { l: 'ESTADO CICLO', v: 'ESTABLE', c: '#22C55E' }
+        ];
+        metrics.forEach((m, idx) => {
+          const col = idx % 2;
+          const row = Math.floor(idx / 2);
+          const x = 32 + col * 480;
+          const y = 120 + row * 155;
+          ctxIot.fillStyle = '#1B1F26';
+          ctxIot.fillRect(x,y,460,140);
+          ctxIot.fillStyle = m.c;
+          ctxIot.fillRect(x,y,10,140);
+          ctxIot.fillStyle = '#8B93A1';
+          ctxIot.font = 'bold 20px sans-serif';
+          ctxIot.fillText(m.l, x+24, y+36);
+          ctxIot.fillStyle = m.c;
+          ctxIot.font = 'bold 44px monospace';
+          ctxIot.fillText(m.v, x+24, y+90);
+        });
+
+        const dash = document.getElementById('dashCanvasEl');
+        const ctxDash = dash.getContext('2d');
+        ctxDash.fillStyle = '#0C0E11';
+        ctxDash.fillRect(0,0,2048,1024);
+        ctxDash.fillStyle = '#14171C';
+        ctxDash.fillRect(0,0,2048,110);
+        ctxDash.fillStyle = '#EEF0F2';
+        ctxDash.font = 'bold 36px monospace';
+        ctxDash.fillText('SENSORTECH AI - SERVIDOR CENTRAL DE MANTENIMIENTO PREDICTIVO', 120, 68);
+        ctxDash.fillStyle = '#22C55E';
+        ctxDash.fillText('[SISTEMA OPERATIVO 99.8%]', 1600, 68);
+
+        // Chart
+        ctxDash.fillStyle = '#14171C';
+        ctxDash.fillRect(30,130,960,420);
+        ctxDash.strokeStyle = '#E2604F';
+        ctxDash.lineWidth = 4;
+        ctxDash.beginPath();
+        for(let x=0; x<900; x+=15) {
+          const y = 340 - Math.sin(x*0.02)*35;
+          if (x===0) ctxDash.moveTo(60+x, y); else ctxDash.lineTo(60+x, y);
+        }
+        ctxDash.stroke();
+
+        ctxDash.strokeStyle = '#3AA8A0';
+        ctxDash.lineWidth = 3;
+        ctxDash.beginPath();
+        for(let x=0; x<900; x+=15) {
+          const y = 430 - Math.sin(x*0.035)*28;
+          if (x===0) ctxDash.moveTo(60+x, y); else ctxDash.lineTo(60+x, y);
+        }
+        ctxDash.stroke();
+
+        // FFT Bars
+        ctxDash.fillStyle = '#14171C';
+        ctxDash.fillRect(30,570,960,420);
+        for(let b=0; b<24; b++) {
+          const bh = Math.abs(Math.sin(b*0.5))*180 + 30;
+          ctxDash.fillStyle = (b%2===0)?'#6B7FD6':'#3AA8A0';
+          ctxDash.fillRect(60+b*38, 920-bh, 30, bh);
+        }
+
+        // Fleet panel
+        ctxDash.fillStyle = '#14171C';
+        ctxDash.fillRect(1010,130,1000,860);
+        ctxDash.fillStyle = '#EEF0F2';
+        ctxDash.font = 'bold 24px monospace';
+        ctxDash.fillText('3. MODELO PREDICTIVO IA - RANDOM FOREST & LSTM', 1040, 180);
+      }
+      window.addEventListener('DOMContentLoaded', initCanvases);
+
+      // Audio engine
+      class AudioEngine {
+        constructor() { this.ctx = null; this.unlocked = false; }
+        getContext() {
+          if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          return this.ctx;
+        }
+        async unlock() {
+          const ctx = this.getContext();
+          if (ctx.state === 'suspended') await ctx.resume();
+          if (!this.unlocked) { this.unlocked = true; this.playChime(); }
+        }
+        playChime() {
+          const ctx = this.getContext();
+          [440, 554, 659, 880].forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
+            gain.gain.setValueAtTime(0.001, ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + idx * 0.08 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.08 + 0.8);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + idx * 0.08);
+            osc.stop(ctx.currentTime + idx * 0.08 + 0.9);
+          });
+        }
+        playPneumatic() {
+          const ctx = this.getContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(150, ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.15);
+          gain.gain.setValueAtTime(0.3, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.2);
+
+          const bufferSize = ctx.sampleRate * 0.6;
+          const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+          const data = buffer.getChannelData(0);
+          for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+          const noise = ctx.createBufferSource();
+          noise.buffer = buffer;
+          const filter = ctx.createBiquadFilter();
+          filter.type = 'bandpass';
+          filter.frequency.setValueAtTime(2400, ctx.currentTime);
+          filter.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.55);
+          const noiseGain = ctx.createGain();
+          noiseGain.gain.setValueAtTime(0.3, ctx.currentTime + 0.02);
+          noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.58);
+          noise.connect(filter);
+          filter.connect(noiseGain);
+          noiseGain.connect(ctx.destination);
+          noise.start(ctx.currentTime + 0.02);
+          noise.stop(ctx.currentTime + 0.6);
+        }
+        playCrane() {
+          const ctx = this.getContext();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(180, ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(240, ctx.currentTime + 0.5);
+          gain.gain.setValueAtTime(0.001, ctx.currentTime);
+          gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 1.5);
+        }
+        speak(text) {
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+            const u = new SpeechSynthesisUtterance(text);
+            u.lang = 'es-ES';
+            window.speechSynthesis.speak(u);
+          }
+        }
+      }
+      const audio = new AudioEngine();
+
+      AFRAME.registerComponent('dynamic-screen', {
+        schema: { canvasId: { type: 'string' } },
+        init: function() {
+          const canvas = document.getElementById(this.data.canvasId);
+          if (!canvas) return;
+          this.texture = new THREE.CanvasTexture(canvas);
+          const mesh = this.el.getObject3D('mesh');
+          if (mesh) {
+            mesh.material = new THREE.MeshBasicMaterial({ map: this.texture, side: THREE.DoubleSide });
+          }
+        },
+        tick: function() {
+          if (this.texture) this.texture.needsUpdate = true;
+        }
+      });
+
+      AFRAME.registerComponent('quest-controller-interaction', {
+        schema: { hand: { type: 'string', default: 'right' } },
+        init: function() {
+          const el = this.el;
+          function handleAction() {
+            audio.unlock();
+            const raycaster = el.components.raycaster;
+            if (raycaster && raycaster.intersectedEls && raycaster.intersectedEls.length > 0) {
+              const target = raycaster.intersectedEls[0];
+              target.emit('click', { cursorEl: el });
+              const lever = target.closest('[interactive-lever]');
+              if (lever) lever.emit('pull');
+              const craneLever = target.closest('[crane-control-lever]');
+              if (craneLever) craneLever.emit('pull');
+              const wp = target.closest('[floor-waypoint]');
+              if (wp) wp.emit('select-waypoint');
+            }
+          }
+          el.addEventListener('triggerdown', handleAction);
+          el.addEventListener('gripdown', handleAction);
+        }
+      });
+
+      AFRAME.registerComponent('interactive-lever', {
+        init: function() {
+          const el = this.el;
+          let pulled = false;
+          function toggle() {
+            pulled = !pulled;
+            audio.playPneumatic();
+            const handle = el.querySelector('.lever-handle');
+            if (handle) {
+              handle.setAttribute('animation', { property: 'rotation', to: pulled ? '40 0 0' : '0 0 0', dur: 250, easing: 'easeOutBack' });
+            }
+          }
+          el.addEventListener('click', toggle);
+          el.addEventListener('pull', toggle);
+        }
+      });
+
+      AFRAME.registerComponent('crane-control-lever', {
+        init: function() {
+          const el = this.el;
+          let moved = false;
+          function operate() {
+            moved = !moved;
+            audio.playCrane();
+            const handle = el.querySelector('.crane-lever-handle');
+            if (handle) {
+              handle.setAttribute('animation', { property: 'rotation', to: moved ? '40 0 0' : '-35 0 0', dur: 300, easing: 'easeOutQuad' });
+            }
+            const crane = document.querySelector('#overhead-crane');
+            if (crane) {
+              crane.setAttribute('animation', { property: 'position', to: moved ? '0 7.8 -6' : '0 7.8 4', dur: 3000, easing: 'easeInOutQuad' });
+            }
+          }
+          el.addEventListener('click', operate);
+          el.addEventListener('pull', operate);
+        }
+      });
+
+      AFRAME.registerComponent('virtual-guide', {
+        init: function() {
+          this.ring1 = this.el.querySelector('.guide-ring-1');
+          this.ring2 = this.el.querySelector('.guide-ring-2');
+          this.ring3 = this.el.querySelector('.guide-ring-3');
+          this.core = this.el.querySelector('.guide-core');
+          this.time = 0;
+        },
+        tick: function(t, dt) {
+          this.time += (dt || 16) * 0.001;
+          if (this.ring1) { this.ring1.object3D.rotation.y += 0.025; this.ring1.object3D.rotation.z += 0.015; }
+          if (this.ring2) { this.ring2.object3D.rotation.x += 0.035; this.ring2.object3D.rotation.y -= 0.015; }
+          if (this.ring3) { this.ring3.object3D.rotation.z -= 0.025; }
+          if (this.core) { this.core.object3D.position.y = Math.sin(this.time * 2.5) * 0.07; }
+        }
+      });
+
+      AFRAME.registerComponent('floor-waypoint', {
+        schema: {
+          pointId: { type: 'number' },
+          targetX: { type: 'number' },
+          targetZ: { type: 'number' },
+          guideX: { type: 'number' },
+          guideZ: { type: 'number' }
+        },
+        init: function() {
+          const self = this;
+          const el = this.el;
+          function go() {
+            audio.unlock();
+            const rig = document.querySelector('#rig');
+            if (rig) rig.setAttribute('animation', { property: 'position', to: `${self.data.targetX} 0 ${self.data.targetZ}`, dur: 800, easing: 'easeInOutQuad' });
+            const guide = document.querySelector('#virtual-guide-entity');
+            if (guide) guide.setAttribute('animation', { property: 'position', to: `${self.data.guideX} 1.6 ${self.data.guideZ}`, dur: 1000, easing: 'easeInOutQuad' });
+            if (self.data.pointId === 1) audio.speak('Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech.');
+            else if (self.data.pointId === 2) audio.speak('Esta es una de nuestras estaciones de inyección. Cuenta con módulos sensoriales compactos: ESP32 con sensores BME280.');
+            else if (self.data.pointId === 3) audio.speak('Punto 03: Dashboard de Machine Learning. Procesando modelos predictivos para calcular la vida útil restante.');
+          }
+          el.addEventListener('click', go);
+          el.addEventListener('select-waypoint', go);
+        }
+      });
+
+      document.getElementById('btnStart').addEventListener('click', async () => {
+        await audio.unlock();
+        document.getElementById('overlay').style.display = 'none';
+        setTimeout(() => {
+          audio.speak('Bienvenido a la planta principal de producción. En estas instalaciones implementamos los lineamientos de la Industria 4.0 mediante SensorTech.');
+        }, 500);
+      });
+    </script>
+
+    <a-scene embedded renderer="antialias: true; colorManagement: true;" vr-mode-ui="enabled: true">
+      <a-assets>
+        <img id="sensortech-logo" src="public/logo-sensortech.svg" alt="SensorTech" />
+      </a-assets>
+
+      <a-light type="ambient" color="#FFFFFF" intensity="0.8"></a-light>
+      <a-light type="directional" color="#FFFFFF" intensity="0.85" position="5 15 5"></a-light>
+      <a-sky color="#B0C4DE"></a-sky>
+
+      <!-- User Rig & Quest 3 Controllers -->
+      <a-entity id="rig" position="0 0 11">
+        <a-camera id="camera" position="0 1.6 0" look-controls wasd-controls="acceleration: 25">
+          <a-cursor color="#00E5FF" opacity="0.8" raycaster="objects: .clickable"></a-cursor>
+        </a-camera>
+        <a-entity id="leftHand" oculus-touch-controls="hand: left; model: true" laser-controls="hand: left" raycaster="objects: .clickable; showLine: true; lineColor: #00E5FF" quest-controller-interaction="hand: left"></a-entity>
+        <a-entity id="rightHand" oculus-touch-controls="hand: right; model: true" laser-controls="hand: right" raycaster="objects: .clickable; showLine: true; lineColor: #00E5FF" quest-controller-interaction="hand: right"></a-entity>
+      </a-entity>
+
+      <!-- Guía Virtual (+25% de distancia: 2.2 1.6 7.2) -->
+      <a-entity id="virtual-guide-entity" position="2.2 1.6 7.2" virtual-guide>
+        <a-text value="GUIA IA SENSORTECH" align="center" position="0 0.95 0" color="#00E5FF" width="4.5"></a-text>
+        <a-entity class="guide-core">
+          <a-sphere radius="0.4" color="#2C3440" metalness="0.8"></a-sphere>
+          <a-cylinder position="0 0 0.32" rotation="90 0 0" radius="0.28" height="0.12" color="#1B1F26"></a-cylinder>
+          <a-sphere position="-0.1 0.04 0.4" scale="0.04 0.08 0.02" color="#FFFFFF" material="emissive:#FFFFFF"></a-sphere>
+          <a-sphere position="0.1 0.04 0.4" scale="0.04 0.08 0.02" color="#FFFFFF" material="emissive:#FFFFFF"></a-sphere>
+          <a-image src="#sensortech-logo" position="0 0 -0.41" rotation="0 180 0" width="0.35" height="0.35"></a-image>
+        </a-entity>
+        <a-torus class="guide-ring-1" radius="0.58" radius-tubular="0.018" color="#00E5FF" material="emissive:#00E5FF"></a-torus>
+        <a-torus class="guide-ring-2" radius="0.68" radius-tubular="0.016" color="#00B0FF" material="emissive:#00B0FF"></a-torus>
+        <a-torus class="guide-ring-3" radius="0.78" radius-tubular="0.014" color="#00E5FF" material="emissive:#00E5FF"></a-torus>
+      </a-entity>
+
+      <!-- Floor -->
+      <a-plane position="0 0 0" rotation="-90 0 0" width="26" height="38" color="#4A5568"></a-plane>
+      <a-plane position="0 0.01 0" rotation="-90 0 0" width="4.8" height="38" color="#0058C6"></a-plane>
+      <a-plane position="-2.4 0.015 0" rotation="-90 0 0" width="0.14" height="38" color="#FFC107"></a-plane>
+      <a-plane position="2.4 0.015 0" rotation="-90 0 0" width="0.14" height="38" color="#FFC107"></a-plane>
+
+      <!-- Entrance with Open Doorway -->
+      <a-box position="-8 5 19" width="10" height="10" depth="0.5" color="#E8ECEF"></a-box>
+      <a-box position="8 5 19" width="10" height="10" depth="0.5" color="#E8ECEF"></a-box>
+      <a-box position="0 8.5 19" width="6" height="3" depth="0.5" color="#E8ECEF"></a-box>
+      <a-box position="-13 5 0" width="0.5" height="10" depth="38" color="#E8ECEF"></a-box>
+      <a-box position="13 5 0" width="0.5" height="10" depth="38" color="#E8ECEF"></a-box>
+
+      <!-- Outside Landscape -->
+      <a-plane position="0 0.005 24" rotation="-90 0 0" width="26" height="10" color="#CBD5E1"></a-plane>
+      <a-plane position="-8 0.01 24" rotation="-90 0 0" width="8" height="10" color="#2E7D32"></a-plane>
+      <a-plane position="8 0.01 24" rotation="-90 0 0" width="8" height="10" color="#2E7D32"></a-plane>
+      <a-plane position="0 0.015 24" rotation="-90 0 0" width="4.8" height="10" color="#0058C6"></a-plane>
+
+      <!-- Puente Grúa 10 Ton SensorTech -->
+      <a-entity id="overhead-crane" position="0 7.8 1">
+        <a-box position="0 0 0" width="25" height="0.75" depth="1.1" color="#F5A623">
+          <a-text value="PUENTE GRUA 10 TON SENSORTECH" align="center" position="0 0 0.58" color="#0A2540" width="12"></a-text>
+        </a-box>
+        <a-box position="-1.5 -0.5 0" width="1.8" height="0.5" depth="1.2" color="#D32F2F"></a-box>
+      </a-entity>
+
+      <!-- Pedestal con Palanca de Control del Puente Grúa -->
+      <a-entity position="2.0 0 6.5" rotation="0 -70 0">
+        <a-box position="0 0.5 0" width="0.6" height="1.0" depth="0.5" color="#1E293B"></a-box>
+        <a-box position="0 0.98 0" width="0.66" height="0.1" depth="0.56" color="#FFC107"></a-box>
+        <a-entity class="clickable crane-control-lever" position="0 1.05 0" crane-control-lever>
+          <a-box class="clickable crane-hitbox" position="0 0.3 0" width="0.9" height="1.0" depth="0.9" material="opacity: 0; transparent: true"></a-box>
+          <a-box position="0 0 0" width="0.22" height="0.08" depth="0.28" color="#0F172A"></a-box>
+          <a-entity class="crane-lever-handle" position="0 0 0" rotation="-30 0 0">
+            <a-cylinder class="clickable" position="0 0.2 0" radius="0.025" height="0.4" color="#E2E8F0"></a-cylinder>
+            <a-sphere class="clickable" position="0 0.42 0" radius="0.065" color="#E2493D"></a-sphere>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+
+      <!-- Kiosko IoT con pantalla dinámica -->
+      <a-entity position="-2.6 0 2.2" rotation="0 45 0">
+        <a-cylinder position="0 0.7 0" radius="0.1" height="1.2" color="#21262E"></a-cylinder>
+        <a-entity position="0 1.35 0" rotation="-22 0 0">
+          <a-box position="0 0 -0.04" width="1.6" height="1.15" depth="0.08" color="#14171C"></a-box>
+          <a-plane position="0 0 0.02" width="1.5" height="1.05" dynamic-screen="canvasId: iotCanvasEl"></a-plane>
+        </a-entity>
+      </a-entity>
+
+      <!-- Dashboard ML con pantalla dinámica -->
+      <a-entity position="0 0 -13">
+        <a-box position="0 2.9 -2.2" width="9.6" height="4.8" depth="0.2" color="#14171C"></a-box>
+        <a-plane position="0 2.9 -2.08" width="9.2" height="4.4" dynamic-screen="canvasId: dashCanvasEl"></a-plane>
+      </a-entity>
+      
+      <!-- BILLBOARDS -->
+      <a-entity position="-12.7 5.5 0" rotation="0 90 0">
+        <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
+        <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#3AA8A0"></a-box>
+        <a-image src="#sensortech-logo" position="-2.3 0 0.05" width="2" height="2"></a-image>
+        <a-text value="SENSORTECH 4.0" position="-0.8 0.6 0.05" color="#EEF0F2" width="7"></a-text>
+        <a-text value="MANTENIMIENTO PREDICTIVO // IA" position="-0.8 0.1 0.05" color="#3AA8A0" width="5.5"></a-text>
+      </a-entity>
+
+      <a-entity position="12.7 5.5 0" rotation="0 -90 0">
+        <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
+        <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#E2604F"></a-box>
+        <a-image src="#sensortech-logo" position="2.3 0 0.05" width="2" height="2"></a-image>
+        <a-text value="ZERO DOWNTIME" position="-2.8 0.6 0.05" color="#EEF0F2" width="7"></a-text>
+        <a-text value="EFICIENCIA OEE SUPERIOR AL 92%" position="-2.8 0.1 0.05" color="#E2604F" width="5.5"></a-text>
+      </a-entity>
+
+      <!-- Waypoints -->
+      <a-entity position="0 0.02 10" floor-waypoint="pointId: 1; targetX: 0; targetZ: 10; guideX: 2.2; guideZ: 7.2" class="clickable">
+        <a-ring radius-inner="1.0" radius-outer="1.18" rotation="-90 0 0" color="#00E5FF" material="emissive:#00E5FF"></a-ring>
+        <a-text value="PUNTO 01 ENTRADA PLANTA 4.0" align="center" position="0 0.03 0.1" rotation="-90 0 0" color="#FFFFFF" width="4.8"></a-text>
+      </a-entity>
+
+      <a-entity position="-2.8 0.02 3" floor-waypoint="pointId: 2; targetX: -2.8; targetZ: 3.0; guideX: -0.6; guideZ: 1.2" class="clickable">
+        <a-ring radius-inner="0.9" radius-outer="1.08" rotation="-90 0 0" color="#00E5FF" material="emissive:#00E5FF"></a-ring>
+        <a-text value="PUNTO 02 SENSOR IOT ESP32" align="center" position="0 0.03 0.1" rotation="-90 0 0" color="#FFFFFF" width="4.2"></a-text>
+      </a-entity>
+
+      <a-entity position="0 0.02 -7" floor-waypoint="pointId: 3; targetX: 0; targetZ: -7.5; guideX: 2.5; guideZ: -9.5" class="clickable">
+        <a-ring radius-inner="1.2" radius-outer="1.4" rotation="-90 0 0" color="#00E5FF" material="emissive:#00E5FF"></a-ring>
+        <a-text value="PUNTO 03 DASHBOARD MACHINE LEARNING" align="center" position="0 0.03 0.1" rotation="-90 0 0" color="#FFFFFF" width="5.0"></a-text>
+      </a-entity>
+
+      <!-- Máquina con Palanca Interactiva -->
+      <a-entity position="-6.5 0 3" rotation="0 90 0">
+        <a-box position="0 0.5 0" width="5.2" height="1.0" depth="1.8" color="#0B2046"></a-box>
+        <a-box position="0 0.88 0" width="5.0" height="0.12" depth="1.7" color="#EAEDF1"></a-box>
+        <a-cone position="1.5 2.5 0" radius-bottom="0.22" radius-top="0.55" height="0.9" color="#B0BEC5"></a-cone>
+        <a-entity class="clickable interactive-lever" position="0.9 1.25 0.96" interactive-lever>
+          <a-box class="clickable lever-hitbox" position="0 0.25 0" width="0.7" height="1.0" depth="0.7" material="opacity: 0; transparent: true"></a-box>
+          <a-box position="0 0 -0.04" width="0.18" height="0.24" depth="0.06" color="#1E293B"></a-box>
+          <a-entity class="lever-handle">
+            <a-cylinder class="clickable" position="0 0.16 0.05" radius="0.018" height="0.32" color="#E2E8F0"></a-cylinder>
+            <a-sphere class="clickable" position="0 0.32 0.05" radius="0.045" color="#E2493D"></a-sphere>
+          </a-entity>
+        </a-entity>
+      </a-entity>
+    </a-scene>
   </body>
 </html>
