@@ -458,4 +458,84 @@ export default function App() {
               <React.Fragment key={`rack2-led-${lidx}`}>
                 <a-sphere position={`0.35 ${ly} 0.53`} radius="0.025" color="#8BD346" material="emissive: #8BD346; emissiveIntensity: 1"></a-sphere>
                 <a-sphere position={`0.25 ${ly} 0.53`} radius="0.025" color="#F0A93A" material="emissive: #F0A93A; emissiveIntensity: 1"></a-sphere>
-                <a-sphere position={`0.15 ${ly} 0.53`} radius="0.025" color="#3AA8A0" material="emissive: #3AA8A0; emissiveIntensity: 1"></a-
+                <a-sphere position={`0.15 ${ly} 0.53`} radius="0.025" color="#3AA8A0" material="emissive: #3AA8A0; emissiveIntensity: 1"></a-sphere>
+                <a-box position={`-0.2 ${ly} 0.53`} width="0.45" height="0.1" depth="0.02" color="#21262E"></a-box>
+              </React.Fragment>
+            ))}
+          </a-entity>
+        </a-entity>
+
+        <a-entity position="-12.7 5.5 0" rotation="0 90 0">
+          <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
+          <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#3AA8A0"></a-box>
+          <a-image src="#sensortech-logo" position="-2.3 0 0.05" width="2" height="2"></a-image>
+          <a-text value="SENSORTECH 4.0" position="-0.8 0.6 0.05" color="#EEF0F2" width="7" font="monoid"></a-text>
+          <a-text value="MANTENIMIENTO PREDICTIVO // IA" position="-0.8 0.1 0.05" color="#3AA8A0" width="5.5" font="monoid"></a-text>
+          <a-text value="Telemetria ESP32 + Redes Neuronales LSTM" position="-0.8 -0.4 0.05" color="#8B93A1" width="4.5" font="monoid"></a-text>
+        </a-entity>
+        <a-entity position="12.7 5.5 0" rotation="0 -90 0">
+          <a-box position="0 0 -0.05" width="7" height="3" depth="0.1" color="#14171C"></a-box>
+          <a-box position="0 0 -0.07" width="7.2" height="3.2" depth="0.05" color="#E2604F"></a-box>
+          <a-image src="#sensortech-logo" position="2.3 0 0.05" width="2" height="2"></a-image>
+          <a-text value="ZERO DOWNTIME" position="-2.8 0.6 0.05" color="#EEF0F2" width="7" font="monoid"></a-text>
+          <a-text value="EFICIENCIA OEE SUPERIOR AL 92%" position="-2.8 0.1 0.05" color="#E2604F" width="5.5" font="monoid"></a-text>
+          <a-text value="Deteccion de fatiga en rodamientos y desalineacion" position="-2.8 -0.4 0.05" color="#8B93A1" width="4.5" font="monoid"></a-text>
+        </a-entity>
+
+        {[
+          { id: 'INX-01', x: -6.5, z: 9, rot: 90, name: 'INX-01 ENGEL 200T' },
+          { id: 'INX-02', x: -6.5, z: 3, rot: 90, name: 'INX-02 ARBURG 370' },
+          { id: 'INX-03', x: -6.5, z: -3, rot: 90, name: 'INX-03 KRAUSS 150T' },
+          { id: 'INX-04', x: 6.5, z: 9, rot: -90, name: 'INX-04 HAITIAN 160T' },
+          { id: 'INX-05', x: 6.5, z: 3, rot: -90, name: 'INX-05 ENGEL 180T' },
+          { id: 'INX-06', x: 6.5, z: -3, rot: -90, name: 'INX-06 ARBURG 320' },
+        ].map(m => (
+          <a-entity key={m.id} id={`machine-${m.id}`} class="machine-unit" position={`${m.x} 0 ${m.z}`} rotation={`0 ${m.rot} 0`}>
+            <a-box position="0 0.5 0" width="5.2" height="1.0" depth="1.8" color="#0B2046"></a-box>
+            <a-box position="0 0.88 0" width="5.0" height="0.12" depth="1.7" color="#EAEDF1"></a-box>
+            <a-box position="-1.5 1.5 0" width="0.4" height="1.2" depth="1.5" color="#0B2046"></a-box>
+            <a-box position="-0.4 1.5 0" width="0.4" height="1.1" depth="1.4" color="#CBD5E1"></a-box>
+            <a-cylinder position="-1.0 1.9 0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
+            <a-cylinder position="-1.0 1.9 -0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
+            <a-cylinder position="-1.0 1.1 0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
+            <a-cylinder position="-1.0 1.1 -0.55" rotation="0 0 90" radius="0.05" height="1.8" color="#94A3B8"></a-cylinder>
+            <a-box position="-1.9 1.5 0" width="0.5" height="0.6" depth="0.6" color="#C62828"></a-box>
+            <a-entity class="injection-piston" position="0 1.5 0">
+              <a-cylinder position="1.1 0 0" rotation="0 0 90" radius="0.22" height="2.2" color="#EAEDF1"></a-cylinder>
+              {[0.4, 0.8, 1.2, 1.6].map((hx, hidx) => (
+                <a-torus key={`band-${hidx}`} position={`${hx} 0 0`} rotation="0 90 0" radius="0.24" radius-tubular="0.035" color="#E2604F" material="emissive: #E2604F; emissiveIntensity: 0.5"></a-torus>
+              ))}
+            </a-entity>
+            <a-sphere class="steam-purge-cloud" position="0 1.5 0" radius="0.6" color="#FFFFFF" material="transparent: true; opacity: 0; roughness: 0.9" visible="false"></a-sphere>
+            <a-cone position="1.5 2.5 0" radius-bottom="0.22" radius-top="0.55" height="0.9" color="#B0BEC5" material="metalness: 0.8; roughness: 0.25"></a-cone>
+            <a-cylinder position="1.5 1.9 0" radius="0.12" height="0.4" color="#0B2046"></a-cylinder>
+            <a-box position="0.2 1.6 0.95" rotation="-15 0 0" width="0.75" height="0.5" depth="0.1" color="#0B2046"></a-box>
+            <a-plane position="0.2 1.61 1.01" rotation="-15 0 0" width="0.65" height="0.4" color="#0C0E11"></a-plane>
+            <a-text value={m.id} align="center" position="0.2 1.65 1.03" rotation="-15 0 0" color="#00E5FF" width="1.8" font="monoid"></a-text>
+
+            <a-entity id={`lever-${m.id}`} class="clickable interactive-lever" position="0.9 1.25 0.96" interactive-lever={`machineId: ${m.id}`}>
+              <a-box class="clickable lever-hitbox" position="0 0.25 0" width="0.7" height="1.0" depth="0.7" material="opacity: 0; transparent: true"></a-box>
+              <a-box position="0 0 -0.04" width="0.18" height="0.24" depth="0.06" color="#1E293B"></a-box>
+              <a-text value="PURGA/MANUAL" align="center" position="0 0.16 0" color="#FFC107" width="1.1" font="monoid"></a-text>
+              <a-entity class="lever-handle" position="0 0 0" rotation="0 0 0">
+                <a-cylinder class="clickable" position="0 0.16 0.05" radius="0.018" height="0.32" color="#E2E8F0" material="metalness: 0.9"></a-cylinder>
+                <a-sphere class="clickable" position="0 0.32 0.05" radius="0.045" color="#E2493D" material="roughness: 0.3"></a-sphere>
+              </a-entity>
+            </a-entity>
+
+            <a-entity position="-2.2 2.1 0.7">
+              <a-cylinder position="0 0 0" radius="0.02" height="0.8" color="#94A3B8"></a-cylinder>
+              <a-cylinder class="status-beacon-green" position="0 0.45 0" radius="0.06" height="0.1" color="#22C55E" material="emissive: #22C55E; emissiveIntensity: 1.0"></a-cylinder>
+              <a-cylinder class="status-beacon-amber" position="0 0.58 0" radius="0.06" height="0.1" color="#14171C" material="emissive: #000; emissiveIntensity: 0"></a-cylinder>
+              <a-cylinder position="0 0.71 0" radius="0.06" height="0.1" color="#14171C" material="emissive: #000; emissiveIntensity: 0"></a-cylinder>
+            </a-entity>
+            <a-box position="0 0.6 1.4" width="4.8" height="0.05" depth="0.05" color="#FFC107"></a-box>
+            <a-box position="0 1.0 1.4" width="4.8" height="0.05" depth="0.05" color="#FFC107"></a-box>
+            <a-cylinder position="-2.3 0.5 1.4" radius="0.03" height="1.0" color="#FFC107"></a-cylinder>
+            <a-cylinder position="2.3 0.5 1.4" radius="0.03" height="1.0" color="#FFC107"></a-cylinder>
+          </a-entity>
+        ))}
+      </a-scene>
+    </div>
+  );
+}
