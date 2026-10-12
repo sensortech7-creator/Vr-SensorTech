@@ -1,0 +1,6 @@
+{
+  "name": "SensorTech VR - Planta de Inyección 4.0",
+  "description": "Entorno virtual 3D interactivo WebXR de la Planta de Inyección SensorTech con mandos Meta Quest 3, monitoreo IoT predictivo y guía virtual.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
