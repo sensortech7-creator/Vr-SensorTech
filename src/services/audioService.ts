@@ -1,7 +1,5 @@
 /**
  * Audio Service for SensorTech VR WebXR Application
- * Implements browser AudioContext unlock policy for VR Browsers (Meta Quest Browser)
- * Synthesizes realistic mechanical, pneumatic, crane, hydraulic, and voice audio.
  */
 
 declare global {
@@ -48,9 +46,7 @@ export class SensorTechAudioService {
     if (ctx.state === 'suspended') {
       try {
         await ctx.resume();
-      } catch (e) {
-        console.warn('AudioContext resume error:', e);
-      }
+      } catch (e) {}
     }
 
     if (!this.unlockedState()) {
@@ -61,12 +57,17 @@ export class SensorTechAudioService {
         source.buffer = buffer;
         source.connect(ctx.destination);
         source.start(0);
-      } catch (e) {
-        // ignore
-      }
+      } catch (e) {}
 
       this.playStartupChime();
       this.startAmbientHum();
+      
+      // Desbloquear también el motor de voz
+      if ('speechSynthesis' in window) {
+        const silentUtterance = new SpeechSynthesisUtterance('');
+        silentUtterance.volume = 0;
+        window.speechSynthesis.speak(silentUtterance);
+      }
     }
     return true;
   }
@@ -101,13 +102,10 @@ export class SensorTechAudioService {
 
       osc1.type = 'sine';
       osc1.frequency.setValueAtTime(60, ctx.currentTime);
-
       osc2.type = 'triangle';
       osc2.frequency.setValueAtTime(120, ctx.currentTime);
-
       filter.type = 'lowpass';
       filter.frequency.setValueAtTime(260, ctx.currentTime);
-
       this.ambientGain.gain.setValueAtTime(0.035, ctx.currentTime);
 
       osc1.connect(filter);
@@ -117,9 +115,7 @@ export class SensorTechAudioService {
 
       osc1.start();
       osc2.start();
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   public playStartupChime() {
@@ -132,120 +128,88 @@ export class SensorTechAudioService {
         const gain = ctx.createGain();
         osc.type = 'sine';
         osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.08);
-
         gain.gain.setValueAtTime(0.001, ctx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.1, ctx.currentTime + idx * 0.08 + 0.02);
         gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.08 + 0.85);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
-
         osc.start(ctx.currentTime + idx * 0.08);
         osc.stop(ctx.currentTime + idx * 0.08 + 0.95);
       });
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
-  /**
-   * Heavy mechanical clank + high-pressure pneumatic steam purge
-   */
   public playLeverPurge() {
     if (this.isMuted) return;
     try {
       const ctx = this.getContext();
-
-      // Mechanical lever latch
       const clankOsc = ctx.createOscillator();
       const clankGain = ctx.createGain();
       clankOsc.type = 'square';
       clankOsc.frequency.setValueAtTime(150, ctx.currentTime);
       clankOsc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.15);
-
       clankGain.gain.setValueAtTime(0.3, ctx.currentTime);
       clankGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
-
       clankOsc.connect(clankGain);
       clankGain.connect(ctx.destination);
       clankOsc.start();
       clankOsc.stop(ctx.currentTime + 0.2);
 
-      // Pneumatic steam purge hiss ("PSSSSSSHHH")
       const bufferSize = ctx.sampleRate * 0.7;
       const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const data = buffer.getChannelData(0);
-      for (let i = 0; i < bufferSize; i++) {
-        data[i] = Math.random() * 2 - 1;
-      }
+      for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
 
       const noise = ctx.createBufferSource();
       noise.buffer = buffer;
-
       const noiseFilter = ctx.createBiquadFilter();
       noiseFilter.type = 'bandpass';
       noiseFilter.frequency.setValueAtTime(2400, ctx.currentTime);
       noiseFilter.frequency.exponentialRampToValueAtTime(900, ctx.currentTime + 0.65);
       noiseFilter.Q.setValueAtTime(3.0, ctx.currentTime);
-
       const noiseGain = ctx.createGain();
       noiseGain.gain.setValueAtTime(0.35, ctx.currentTime + 0.03);
       noiseGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.68);
-
       noise.connect(noiseFilter);
       noiseFilter.connect(noiseGain);
       noiseGain.connect(ctx.destination);
-
       noise.start(ctx.currentTime + 0.02);
       noise.stop(ctx.currentTime + 0.7);
 
-      // Hydraulic pump thrum
       const hydroOsc = ctx.createOscillator();
       const hydroGain = ctx.createGain();
       hydroOsc.type = 'sawtooth';
       hydroOsc.frequency.setValueAtTime(85, ctx.currentTime + 0.1);
       hydroOsc.frequency.linearRampToValueAtTime(110, ctx.currentTime + 0.4);
       hydroOsc.frequency.linearRampToValueAtTime(80, ctx.currentTime + 0.7);
-
       hydroGain.gain.setValueAtTime(0.001, ctx.currentTime);
       hydroGain.gain.linearRampToValueAtTime(0.12, ctx.currentTime + 0.2);
       hydroGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.75);
-
       hydroOsc.connect(hydroGain);
       hydroGain.connect(ctx.destination);
       hydroOsc.start(ctx.currentTime + 0.1);
       hydroOsc.stop(ctx.currentTime + 0.8);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
-  /**
-   * Sound when moving the 10-Ton Overhead Crane across the ceiling
-   */
   public playCraneMove() {
     if (this.isMuted) return;
     try {
       const ctx = this.getContext();
-
-      // Industrial rolling rail whine
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sawtooth';
       osc.frequency.setValueAtTime(180, ctx.currentTime);
       osc.frequency.linearRampToValueAtTime(240, ctx.currentTime + 0.5);
       osc.frequency.linearRampToValueAtTime(190, ctx.currentTime + 1.2);
-
       gain.gain.setValueAtTime(0.001, ctx.currentTime);
       gain.gain.linearRampToValueAtTime(0.15, ctx.currentTime + 0.2);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.4);
-
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start();
       osc.stop(ctx.currentTime + 1.5);
 
-      // Dual crane warning chimes
       [0.1, 0.5, 0.9].forEach(t => {
         const beep = ctx.createOscillator();
         const bGain = ctx.createGain();
@@ -258,9 +222,7 @@ export class SensorTechAudioService {
         beep.start(ctx.currentTime + t);
         beep.stop(ctx.currentTime + t + 0.16);
       });
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   public playBeep(high: boolean = false) {
@@ -269,22 +231,16 @@ export class SensorTechAudioService {
       const ctx = this.getContext();
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-
       osc.type = 'sine';
       osc.frequency.setValueAtTime(high ? 1760 : 1050, ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(high ? 2100 : 1320, ctx.currentTime + 0.06);
-
       gain.gain.setValueAtTime(0.12, ctx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-
       osc.connect(gain);
       gain.connect(ctx.destination);
-
       osc.start();
       osc.stop(ctx.currentTime + 0.09);
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   public playAlert() {
@@ -297,18 +253,14 @@ export class SensorTechAudioService {
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(680, ctx.currentTime + delay);
         osc.frequency.setValueAtTime(520, ctx.currentTime + delay + 0.08);
-
         gain.gain.setValueAtTime(0.18, ctx.currentTime + delay);
         gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.15);
-
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(ctx.currentTime + delay);
         osc.stop(ctx.currentTime + delay + 0.16);
       });
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
 
   public speakWaypoint(pointNumber: number) {
@@ -329,34 +281,17 @@ export class SensorTechAudioService {
     if (!text) return;
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'es-ES';
+    utterance.lang = 'es-MX';
     utterance.rate = 1.0;
     utterance.pitch = 1.04;
     if (this.speechVoice) {
       utterance.voice = this.speechVoice;
     }
 
-    this.currentUtterance = utterance;
+    // PARCHE VITAL PARA META QUEST: Previene que el navegador borre la voz
+    (window as any).__currentSpeech = utterance;
+    
     window.speechSynthesis.speak(utterance);
-  }
-
-  public speak(text: string) {
-    if (this.isMuted) return;
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'es-ES';
-      utterance.rate = 1.05;
-      utterance.pitch = 1.02;
-      if (this.speechVoice) {
-        utterance.voice = this.speechVoice;
-      }
-      this.currentUtterance = utterance;
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      // ignore
-    }
   }
 }
 
