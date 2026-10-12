@@ -60,6 +60,7 @@ export class SensorTechAudioService {
       this.playStartupChime();
       this.startAmbientHum();
       
+      // DESBLOQUEO DEL MOTOR DE VOZ
       if ('speechSynthesis' in window) {
         const silentUtterance = new SpeechSynthesisUtterance('');
         silentUtterance.volume = 0;
